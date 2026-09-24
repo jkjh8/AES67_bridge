@@ -1,0 +1,695 @@
+﻿<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AES67 Bridge</title>
+<style>
+:root {
+  --bg: #f5f6f8; --card: #ffffff; --line: #e3e6ea; --text: #1d2327; --muted: #6b7680;
+  --accent: #2e9d62; --accent-weak: #e3f3ea; --danger: #d32f2f; --warn: #ef8a00;
+  --g-wasapi: #1e78d6; --g-wasapi-bg: #e2ecf7;
+  --g-asio: #e8710a;   --g-asio-bg: #fbeee2;
+  --g-aes: #7b1fa2;    --g-aes-bg: #efe6f3;
+  --radius: 16px; --shadow: 0 1px 2px rgba(0,0,0,.05), 0 2px 8px rgba(0,0,0,.04);
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
+  font: 14px/1.45 "Segoe UI", "Malgun Gothic", system-ui, sans-serif; }
+button { font: inherit; cursor: pointer; }
+svg.i { width: 22px; height: 22px; fill: currentColor; flex: none; }
+
+header { height: 60px; background: #fff; border-bottom: 1px solid var(--line);
+  display: flex; align-items: center; padding: 0 20px; gap: 12px; }
+header .logo { display: flex; align-items: center; gap: 10px; font-size: 22px; font-weight: 700; }
+header .logo .badge67 { background: var(--accent); color: #fff; font-size: 13px; font-weight: 800;
+  border-radius: 6px; padding: 2px 6px; }
+header .sub { color: var(--muted); font-size: 15px; }
+header .spacer { flex: 1; }
+.ptp-pill { display: flex; align-items: center; gap: 6px; font-weight: 600; font-size: 13px; }
+.ptp-pill.locked { color: var(--accent); } .ptp-pill.locking { color: var(--warn); }
+.ptp-pill.unlocked { color: var(--danger); }
+.ptp-pill code { font-family: Consolas, monospace; font-weight: 500; }
+
+.layout { display: flex; height: calc(100% - 60px); }
+nav { width: 76px; background: #fff; border-right: 1px solid var(--line); padding-top: 10px; flex: none; }
+nav button { display: flex; flex-direction: column; align-items: center; gap: 3px; width: 100%;
+  border: 0; background: none; padding: 11px 0; color: #2b3238; font-size: 11px; }
+nav button:hover { background: #f1f3f5; }
+nav button.active { background: var(--accent-weak); color: var(--accent); font-weight: 600; }
+main { flex: 1; overflow: auto; padding: 22px 26px 40px; }
+h2 { font-size: 20px; margin: 0 0 16px; display: flex; align-items: center; gap: 10px; }
+.section-head { display: flex; align-items: center; gap: 10px; margin: 6px 0 12px;
+  font-weight: 700; letter-spacing: .06em; color: #3c464e; font-size: 13px; text-transform: uppercase; }
+.section-head .spacer { flex: 1; }
+
+.card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
+  box-shadow: var(--shadow); margin-bottom: 14px; }
+.card-head { display: flex; align-items: center; gap: 12px; padding: 16px 20px;
+  border-bottom: 1px solid var(--line); }
+.card-head .title { font-size: 17px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.card-head .spacer { flex: 1; }
+.card-body { padding: 14px 20px 16px; }
+.kv { display: flex; flex-wrap: wrap; gap: 8px 28px; }
+.kv > div { white-space: nowrap; } .kv .k { color: var(--muted); margin-right: 6px; }
+.kv .mono { font-family: Consolas, monospace; color: var(--accent); }
+.cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 14px; align-items: start; }
+.cols.wide { grid-template-columns: repeat(auto-fit, minmax(760px, 1fr)); }
+.cols.single { grid-template-columns: 1fr; }
+.cols.wide select { white-space: normal; text-overflow: clip; }
+.cols.wide .kv > div { white-space: normal; }
+.tag { display: inline-block; border-radius: 5px; padding: 1px 7px; font-size: 11px; font-weight: 700;
+  color: #fff; letter-spacing: .03em; }
+.tag.wasapi { background: var(--g-wasapi); } .tag.asio { background: var(--g-asio); }
+.tag.aes { background: var(--g-aes); }
+.badge { border: 1px solid currentColor; border-radius: 6px; padding: 0 8px; font-size: 13px; }
+.badge.ok { color: var(--accent); } .badge.off { color: #8a949c; }
+.badge.warn { color: var(--warn); } .badge.err { color: var(--danger); }
+.err-line { color: var(--danger); margin-top: 8px; font-size: 13px; }
+.warn-line { color: var(--warn); margin-top: 8px; font-size: 13px; }
+.muted { color: var(--muted); }
+
+.btn { border: 0; border-radius: 9px; padding: 7px 14px; background: var(--accent); color: #fff;
+  font-weight: 600; font-size: 14px; display: inline-flex; align-items: center; gap: 6px; }
+.btn:hover { filter: brightness(1.06); }
+.btn.ghost { background: #eef1f3; color: #2b3238; }
+.btn.danger { background: var(--danger); }
+.btn svg.i { width: 18px; height: 18px; }
+.icon-btn { border: 0; background: none; width: 36px; height: 36px; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center; color: #6d767e; }
+.icon-btn:hover { background: #f0f2f4; }
+.icon-btn.red { color: var(--danger); } .icon-btn.orange { color: #fff; background: var(--warn); }
+.icon-btn.orange:hover { filter: brightness(1.05); background: var(--warn); }
+.icon-btn.green { color: #fff; background: var(--accent); }
+
+.form-row { display: grid; grid-template-columns: 150px 1fr; align-items: center; gap: 10px; margin-bottom: 12px; }
+.form-row label { color: #3c464e; font-weight: 600; }
+input[type=text], input[type=number], select { width: 100%; border: 1px solid #d5dade; border-radius: 9px;
+  padding: 8px 11px; font: inherit; background: #fff; color: var(--text); }
+input:focus, select:focus { outline: 2px solid #b9e0c9; border-color: var(--accent); }
+.switch { position: relative; width: 44px; height: 24px; flex: none; }
+.switch input { opacity: 0; width: 0; height: 0; }
+.switch span { position: absolute; inset: 0; background: #c7cdd2; border-radius: 24px; transition: .15s; cursor: pointer; }
+.switch span::before { content: ""; position: absolute; width: 18px; height: 18px; left: 3px; top: 3px;
+  background: #fff; border-radius: 50%; transition: .15s; box-shadow: 0 1px 2px rgba(0,0,0,.2); }
+.switch input:checked + span { background: var(--accent); }
+.switch input:checked + span::before { transform: translateX(20px); }
+
+.modal-bg { position: fixed; inset: 0; background: rgba(20,26,30,.35); display: none;
+  align-items: center; justify-content: center; z-index: 10; }
+.modal-bg.open { display: flex; }
+.modal { background: #fff; border-radius: 18px; width: min(640px, 94vw); max-height: 90vh; overflow: auto;
+  box-shadow: 0 10px 40px rgba(0,0,0,.2); }
+.modal .card-head { position: sticky; top: 0; background: #fff; border-radius: 18px 18px 0 0; }
+.modal-foot { display: flex; justify-content: flex-end; gap: 8px; padding: 12px 20px 18px; }
+pre.sdp { background: #f4f6f8; border-radius: 10px; padding: 12px; font: 12px/1.5 Consolas, monospace;
+  white-space: pre-wrap; word-break: break-all; margin: 0; }
+table.list { width: 100%; border-collapse: collapse; }
+table.list th, table.list td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--line); }
+table.list th { color: var(--muted); font-weight: 600; font-size: 12px; }
+table.list tr.local td { color: #9aa3aa; }
+
+.mx-wrap { overflow: auto; background: #fff; border: 1px solid var(--line); border-radius: var(--radius);
+  box-shadow: var(--shadow); padding: 14px; max-height: calc(100vh - 170px); }
+table.mx { border-collapse: separate; border-spacing: 2px; }
+table.mx th { font-weight: 600; padding: 0; background: #fff; }
+table.mx thead th { position: sticky; top: 0; z-index: 2; }
+table.mx thead tr:nth-child(2) th { top: 38px; }
+table.mx th.rowh { position: sticky; left: 0; z-index: 1; }
+table.mx th.rown { position: sticky; left: 194px; z-index: 1; min-width: 30px; }
+table.mx thead th.corner { left: 0; z-index: 3; position: sticky; }
+.grp { display: flex; align-items: center; justify-content: center; gap: 4px; padding: 4px 2px; white-space: nowrap; overflow: hidden;
+  border-bottom: 3px solid var(--line); cursor: pointer; user-select: none; height: 36px; }
+.grp.wasapi { border-color: var(--g-wasapi); } .grp.asio { border-color: var(--g-asio); }
+.grp.aes { border-color: var(--g-aes); }
+.grp .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; font-size: 12px; color: #3c464e; }
+.grp.off .name { color: #a0a8ae; }
+.grp svg.i { width: 16px; height: 16px; color: #6d767e; transition: .15s; }
+.grp.collapsed svg.i { transform: rotate(-90deg); }
+.rgrp { display: flex; align-items: center; gap: 6px; padding: 0 8px 0 2px; white-space: nowrap;
+  cursor: pointer; user-select: none; width: 190px; }
+.rgrp .name { max-width: 120px; overflow: hidden; text-overflow: ellipsis; font-size: 12px; color: #3c464e; }
+.rgrp.off .name { color: #a0a8ae; }
+.rgrp svg.i { width: 16px; height: 16px; color: #6d767e; transition: .15s; }
+.rgrp.collapsed svg.i { transform: rotate(-90deg); }
+.chn { width: 30px; min-width: 30px; max-width: 30px; height: 26px; text-align: center; font-size: 12px; color: #3c464e; }
+td.x { width: 30px; min-width: 30px; max-width: 30px; height: 30px; border-radius: 4px; cursor: pointer; }
+td.x:hover { outline: 2px solid #8fb9a2; outline-offset: -2px; }
+tr.r-wasapi td.x { background: var(--g-wasapi-bg); } tr.r-asio td.x { background: var(--g-asio-bg); }
+tr.r-aes td.x { background: var(--g-aes-bg); }
+tr td.x.on.c-wasapi { background: var(--g-wasapi); } tr td.x.on.c-asio { background: var(--g-asio); }
+tr td.x.on.c-aes { background: var(--g-aes); }
+td.x.agg { cursor: default; font-size: 11px; text-align: center; color: #fff; }
+tr td.x.agg.has.c-wasapi { background: #7fb0e6; } tr td.x.agg.has.c-asio { background: #f1ab6c; }
+tr td.x.agg.has.c-aes { background: #b67fcc; }
+td.sep { width: 8px; } tr.sep td { height: 8px; }
+.legend { display: flex; gap: 18px; align-items: center; color: var(--muted); font-size: 13px; margin-bottom: 10px; flex-wrap: wrap; }
+
+.toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #263238; color: #fff;
+  padding: 10px 18px; border-radius: 10px; opacity: 0; transition: .2s; pointer-events: none; z-index: 20; max-width: 80vw; }
+.toast.show { opacity: 1; } .toast.err { background: var(--danger); }
+footer { position: fixed; bottom: 0; }
+.empty { color: var(--muted); padding: 26px; text-align: center; }
+.dev-select-row { display: flex; gap: 10px; align-items: center; }
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">AES67 Bridge <span class="badge67">67</span></div>
+  <div class="sub">Windows Audio over IP</div>
+  <div class="spacer"></div>
+  <div id="ptpPill" class="ptp-pill unlocked"></div>
+</header>
+<div class="layout">
+  <nav id="nav"></nav>
+  <main id="main"></main>
+</div>
+<div id="modalBg" class="modal-bg"><div class="modal" id="modal"></div></div>
+<div id="toast" class="toast"></div>
+
+<script>
+"use strict";
+const P = {
+  dash: "M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z",
+  grid: "M20 2H4c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zM8 20H4v-4h4v4zm0-6H4v-4h4v4zm0-6H4V4h4v4zm6 12h-4v-4h4v4zm0-6h-4v-4h4v4zm0-6h-4V4h4v4zm6 12h-4v-4h4v4zm0-6h-4v-4h4v4zm0-6h-4V4h4v4z",
+  up: "M9 16h6v-6h4l-7-7-7 7h4zm-4 2h14v2H5z",
+  down: "M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z",
+  dev: "M17 2H7c-1.1 0-2 .9-2 2v16c0 1.1.9 1.99 2 1.99L17 22c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-5 2c1.1 0 2 .9 2 2s-.9 2-2 2c-1.11 0-2-.9-2-2s.89-2 2-2zm0 16c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z",
+  add: "M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z",
+  edit: "M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z",
+  del: "M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z",
+  pause: "M6 19h4V5H6v14zm8-14v14h4V5h-4z",
+  play: "M8 5v14l11-7z",
+  code: "M9.4 16.6L4.8 12l4.6-4.6L8 6l-6 6 6 6 1.4-1.4zm5.2 0l4.6-4.6-4.6-4.6L16 6l6 6-6 6-1.4-1.4z",
+  chev: "M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z",
+  ptp: "M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3A8.994 8.994 0 0 0 13 3.06V1h-2v2.06A8.994 8.994 0 0 0 3.06 11H1v2h2.06A8.994 8.994 0 0 0 11 20.94V23h2v-2.06A8.994 8.994 0 0 0 20.94 13H23v-2h-2.06zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z",
+  close: "M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z",
+  refresh: "M17.65 6.35A7.958 7.958 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0 1 12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z",
+  aes: "M4 10h3V7h2V5h6v2h2v3h3v9H4v-9zm4 3v4h2v-4H8zm3 0v4h2v-4h-2zm3 0v4h2v-4h-2z",
+};
+const icon = (n, cls = "i") => `<svg class="${cls}" viewBox="0 0 24 24"><path d="${P[n]}"/></svg>`;
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+const host = window.chrome && window.chrome.webview;
+function reportError(msg) {
+  try { if (host) host.postMessage(JSON.stringify({ cmd: "log", rid: 0, text: String(msg) })); } catch (e) {}
+}
+window.addEventListener("error", e => reportError(`${e.message} @${e.lineno}:${e.colno}`));
+window.addEventListener("unhandledrejection", e => reportError(`promise: ${e.reason}`));
+let ridSeq = 0;
+const pending = {};
+function send(cmd, data = {}) {
+  const rid = ++ridSeq;
+  const msg = JSON.stringify({ cmd, rid, ...data });
+  return new Promise(res => {
+    pending[rid] = res;
+    if (host) host.postMessage(msg); else mockHandle(JSON.parse(msg));
+  });
+}
+function onHostMessage(m) {
+  if (!m || !m.type) return;
+  if (m.type === "show") { page = "status"; closeModal(); renderNav(); render(true); }
+  else if (m.type === "state") { S = m; render(); }
+  else if (m.type === "devices") { DEV = m; render(true); }
+  else if (m.type === "result") {
+    const cb = pending[m.rid]; delete pending[m.rid];
+    if (!m.ok) toast(m.error || "Failed", true);
+    if (cb) cb(m);
+  }
+}
+if (host) host.addEventListener("message", ev => onHostMessage(ev.data));
+
+let toastTimer = 0;
+function toast(text, err = false) {
+  const t = document.getElementById("toast");
+  t.textContent = text; t.className = "toast show" + (err ? " err" : "");
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.className = "toast", err ? 5000 : 2200);
+}
+
+let S = null;
+let DEV = { render: [], capture: [] };
+const store = {
+  get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+  set(k, v) { try { store.set(k, v); } catch (e) {} },
+};
+let page = "status";
+let collapsed = {};
+try { collapsed = JSON.parse(store.get("collapsed") || "{}"); } catch (e) {}
+let lastRendered = "";
+
+const PAGES = [
+  ["status", "Status", "dash"], ["matrix", "Matrix", "grid"], ["tx", "Transmit", "up"],
+  ["rx", "Receive", "down"], ["devices", "Devices", "dev"],
+];
+function renderNav() {
+  document.getElementById("nav").innerHTML = PAGES.map(([id, label, ic]) =>
+    `<button class="${page === id ? "active" : ""}" data-page="${id}">${icon(ic)}<span>${label}</span></button>`).join("");
+}
+document.getElementById("nav").addEventListener("click", e => {
+  const b = e.target.closest("button[data-page]"); if (!b) return;
+  page = b.dataset.page; renderNav(); render(true);
+});
+
+function renderPtp() {
+  const el = document.getElementById("ptpPill");
+  const p = (S && S.ptp) || { lock: "unlocked", gmid: "" };
+  el.className = "ptp-pill " + p.lock;
+  const label = { locked: "PTP Locked", locking: "PTP Locking…", unlocked: "PTP Unlocked" }[p.lock];
+  el.innerHTML = `${icon("ptp")}<span>${label}</span>${p.gmid ? `<span>· GM <code>${esc(p.gmid)}</code></span>` : ""}` +
+    (S && S.node ? `<span class="muted" style="font-weight:400">· ${esc(S.node.ip)}</span>` : "");
+}
+
+function render(force = false) {
+  renderPtp();
+  if (!S) { document.getElementById("main").innerHTML = `<div class="empty">Connecting…</div>`; return; }
+  const key = page + JSON.stringify(pageInputs());
+  if (!force && key === lastRendered) return;
+  lastRendered = key;
+  const main = document.getElementById("main");
+  const scroll = main.querySelector(".mx-wrap")?.scrollLeft;
+  const scrollT = main.querySelector(".mx-wrap")?.scrollTop;
+  main.innerHTML = ({ status: pageStatus, matrix: pageMatrix, tx: pageTx, rx: pageRx, devices: pageDevices }[page])();
+  const w = main.querySelector(".mx-wrap");
+  if (w && scroll != null) { w.scrollLeft = scroll; w.scrollTop = scrollT; }
+}
+function pageInputs() {
+  switch (page) {
+    case "matrix": return [S.ports, S.routes, collapsed];
+    case "tx": return [S.tx, S.ptp];
+    case "rx": return [S.rx, S.sap.length];
+    case "devices": return [S.audio, S.asio, DEV];
+    default: return [S];
+  }
+}
+
+function devLine(d, enabled) {
+  if (!enabled) return `<span class="badge off">Disabled</span>`;
+  if (!d.running) return `<span class="badge err">Error</span><div class="err-line">${esc(d.error || "Cannot open device")}</div>`;
+  return `<span class="badge ok">ON</span> <b style="margin-left:8px">${esc(d.name)}</b>
+    <span class="muted"> · ${d.channels}ch · ${d.rate} Hz</span>
+    ${d.error ? `<div class="warn-line">${esc(d.error)}</div>` : ""}`;
+}
+function pageStatus() {
+  const p = S.ptp || {};
+  const txOn = S.tx.filter(t => t.running).length, rxOn = S.rx.filter(r => r.receiving).length;
+  const a = S.asio;
+  return `<h2>Status</h2><div class="cols single">
+  <div class="card"><div class="card-head">${icon("ptp")}<span class="title">PTP</span><div class="spacer"></div>
+    <span class="badge ${p.lock === "locked" ? "ok" : p.lock === "locking" ? "warn" : "err"}">${esc(p.lock)}</span></div>
+    <div class="card-body kv"><div><span class="k">Grandmaster</span><span class="mono">${esc(p.gmid || "-")}</span></div>
+    <div><span class="k">Domain</span>${p.domain ?? 0}</div><div><span class="k">Role</span>Slave</div>
+    <div><span class="k">IP</span>${esc(S.node.ip)}</div></div></div>
+  <div class="card"><div class="card-head">${icon("aes")}<span class="title">AES67 Streams</span></div>
+    <div class="card-body kv"><div><span class="k">TX</span>${txOn} / ${S.tx.length} running</div>
+    <div><span class="k">RX</span>${rxOn} / ${S.rx.length} receiving</div>
+    <div><span class="k">Discovered</span>${S.sap.length}</div><div><span class="k">Format</span>L24 / 48 kHz / 1 ms</div></div></div>
+  <div class="card"><div class="card-head"><span class="tag wasapi">WASAPI</span><span class="title">Windows Audio</span></div>
+    <div class="card-body"><div style="margin-bottom:10px"><span class="k muted">In&nbsp;</span>${devLine(S.audio.input, S.audio.input_enabled)}</div>
+    <div><span class="k muted">Out&nbsp;</span>${devLine(S.audio.output, S.audio.output_enabled)}</div></div></div>
+  <div class="card"><div class="card-head"><span class="tag asio">ASIO</span><span class="title">ASIO Driver</span><div class="spacer"></div>
+    <span class="badge ${a.registered ? "ok" : "warn"}">${a.registered ? "Registered" : "Not registered"}</span></div>
+    <div class="card-body kv"><div><span class="k">Channels</span>32 in / 32 out</div>
+    <div><span class="k">Clock</span>PTP</div></div></div>
+  </div>`;
+}
+
+function groupsOf(ports) {
+  return ports.map(p => ({ ...p, n: Math.max(0, p.channels | 0) }));
+}
+const gkey = (side, id) => side + ":" + id;
+const shortName = p => p.name.replace(/^(WASAPI|ASIO)\s+/, "");
+const isCollapsed = k => k in collapsed ? collapsed[k] : k.endsWith(":asio");
+const tagText = p => p.group === "aes" ? (p.id.startsWith("tx") ? "TX" : "RX") : p.group === "wasapi" ? "WIN" : "ASIO";
+
+function pageMatrix() {
+  const src = groupsOf(S.ports.src), dst = groupsOf(S.ports.dst);
+  const on = new Set(S.routes.map(r => `${r.src}|${r.sc}|${r.dst}|${r.dc}`));
+  const cnt = (sp, dp) => S.routes.filter(r => r.src === sp && r.dst === dp).length;
+  let h = `<h2>Crosspoint Matrix<span style="flex:1"></span>
+    <button class="btn ghost" data-act="collapse-all">Collapse all</button>
+    <button class="btn ghost" data-act="expand-all">Expand all</button></h2>
+    <div class="legend"><span><span class="tag wasapi">WIN</span> WASAPI</span>
+    <span><span class="tag asio">ASIO</span> DAW</span><span><span class="tag aes">TX/RX</span> AES67</span></div>`;
+  if (!dst.length) return h + `<div class="empty">No outputs.</div>`;
+  h += `<div class="mx-wrap"><table class="mx"><thead><tr>
+    <th class="corner" colspan="2" rowspan="2" style="vertical-align:bottom;text-align:left">
+      <div style="color:var(--accent);font-size:12px;border-bottom:2px solid #9fcdb4;padding:0 6px 4px">OUTPUT →</div>
+      <div style="color:var(--accent);font-size:12px;padding:4px 6px 0">↓ INPUT</div></th>`;
+  dst.forEach((d, gi) => {
+    const col = isCollapsed(gkey("d", d.id));
+    if (gi) h += `<th class="sep"></th>`;
+    const span = col ? 1 : Math.max(1, d.n);
+    h += `<th colspan="${span}"><div class="grp ${d.group}${col ? " collapsed" : ""}${d.active ? "" : " off"}"
+      style="width:${span * 32 - 2}px" data-toggle="${gkey("d", d.id)}" title="${esc(d.name)}${d.active ? "" : " (inactive)"}">
+      ${span === 2 ? "" : icon("chev")}${span > 1 ? `<span class="tag ${d.group}">${tagText(d)}</span>` : ""}
+      ${span > 2 ? `<span class="name">${esc(shortName(d))}</span>` : ""}</div></th>`;
+  });
+  h += `</tr><tr>`;
+  dst.forEach((d, gi) => {
+    if (gi) h += `<th class="sep"></th>`;
+    if (isCollapsed(gkey("d", d.id))) h += `<th class="chn">…</th>`;
+    else for (let c = 0; c < d.n; c++) h += `<th class="chn">${c + 1}</th>`;
+  });
+  h += `</tr></thead><tbody>`;
+  src.forEach((s, si) => {
+    const rcol = isCollapsed(gkey("s", s.id));
+    const rows = rcol ? 1 : Math.max(1, s.n);
+    if (si) h += `<tr class="sep"><td colspan="999"></td></tr>`;
+    for (let r = 0; r < rows; r++) {
+      h += `<tr class="r-${s.group}">`;
+      if (r === 0) h += `<th class="rowh" rowspan="${rows}" style="vertical-align:top">
+        <div class="rgrp ${rcol ? "collapsed" : ""}${s.active ? "" : " off"}" data-toggle="${gkey("s", s.id)}"
+        title="${esc(s.name)}${s.active ? "" : " (inactive)"}" style="height:30px">${icon("chev")}
+        <span class="tag ${s.group}">${tagText(s)}</span><span class="name">${esc(shortName(s))}</span></div></th>`;
+      h += `<th class="rown chn">${rcol ? "…" : r + 1}</th>`;
+      dst.forEach((d, gi) => {
+        if (gi) h += `<td class="sep"></td>`;
+        const dcol = isCollapsed(gkey("d", d.id));
+        if (rcol || dcol) {
+          let n = 0;
+          if (rcol && dcol) n = cnt(s.id, d.id);
+          else if (rcol) {  }
+          if (rcol && !dcol) {
+            for (let c = 0; c < d.n; c++) {
+              const k = S.routes.filter(x => x.src === s.id && x.dst === d.id && x.dc === c).length;
+              h += `<td class="x agg c-${d.group}${k ? " has" : ""}" data-expand="${gkey("s", s.id)}" title="Expand to edit">${k || ""}</td>`;
+            }
+          } else if (!rcol && dcol) {
+            const k = S.routes.filter(x => x.src === s.id && x.dst === d.id && x.sc === r).length;
+            h += `<td class="x agg c-${d.group}${k ? " has" : ""}" data-expand="${gkey("d", d.id)}" title="Expand to edit">${k || ""}</td>`;
+          } else {
+            h += `<td class="x agg c-${d.group}${n ? " has" : ""}" data-expand="${gkey("s", s.id)},${gkey("d", d.id)}" title="Expand to edit">${n || ""}</td>`;
+          }
+        } else {
+          for (let c = 0; c < d.n; c++) {
+            const k = `${s.id}|${r}|${d.id}|${c}`;
+            h += `<td class="x c-${d.group}${on.has(k) ? " on" : ""}" data-x="${esc(k)}"
+              title="${esc(s.name)} ${r + 1} → ${esc(d.name)} ${c + 1}"></td>`;
+          }
+        }
+      });
+      h += `</tr>`;
+    }
+  });
+  return h + `</tbody></table></div>`;
+}
+
+function txStatusBadge(t) {
+  if (!t.enabled) return `<span class="badge off">OFF</span>`;
+  if (t.error) return `<span class="badge err">ERROR</span>`;
+  return t.running ? `<span class="badge ok">ON</span>` : `<span class="badge warn">…</span>`;
+}
+function pageTx() {
+  let h = `<div class="section-head">${icon("up")}<span>Transmit · Sources</span>
+    <div class="spacer"></div><button class="btn" data-act="tx-add">${icon("add")}Add</button></div>`;
+  if (!S.tx.length) h += `<div class="card"><div class="empty">No transmit streams.</div></div>`;
+  h += `<div class="cols">`;
+  for (const t of S.tx) {
+    h += `<div class="card"><div class="card-head">${icon("aes")}<span class="title">${esc(t.name)}</span>${txStatusBadge(t)}
+      <div class="spacer"></div>
+      <button class="icon-btn" title="SDP" data-act="tx-sdp" data-id="${t.id}">${icon("code")}</button>
+      <button class="icon-btn" title="Edit" data-act="tx-edit" data-id="${t.id}">${icon("edit")}</button>
+      <button class="icon-btn ${t.enabled ? "orange" : "green"}" title="${t.enabled ? "Pause" : "Start"}" data-act="tx-toggle" data-id="${t.id}">${icon(t.enabled ? "pause" : "play")}</button>
+      <button class="icon-btn red" title="Delete" data-act="tx-del" data-id="${t.id}">${icon("del")}</button></div>
+      <div class="card-body"><div class="muted" style="font-weight:700;letter-spacing:.06em;font-size:12px;margin-bottom:8px">OUTPUT</div>
+      <div class="kv"><div><span class="k">Addr</span><span class="mono">${esc(t.address)}:${t.port}</span></div>
+      <div><span class="k">Codec</span>L24</div><div><span class="k">Pkt</span>48 <span class="muted">(1ms)</span></div>
+      <div><span class="k">Ch</span>${t.channels}ch</div><div><span class="k">PT</span>${t.pt}</div><div><span class="k">TTL</span>${t.ttl}</div>
+      <div><span class="k">Packets</span>${(t.packets || 0).toLocaleString()}</div></div>
+      ${t.error ? `<div class="err-line">${esc(t.error)}</div>` : ""}
+      ${t.running && S.ptp && S.ptp.lock !== "locked" ? `<div class="warn-line">PTP not locked</div>` : ""}</div></div>`;
+  }
+  return h + `</div>`;
+}
+function nextTxAddress() {
+  const used = new Set(S.tx.map(t => t.address));
+  for (let i = 1; i < 255; i++) { const a = `239.69.0.${i}`; if (!used.has(a)) return a; }
+  return "239.69.1.1";
+}
+function chSelect(v) {
+  return `<select name="channels">${[1, 2, 4, 6, 8].map(n => `<option value="${n}" ${n == v ? "selected" : ""}>${n}ch</option>`).join("")}</select>`;
+}
+function openTxForm(t) {
+  const isNew = !t;
+  t = t || { id: 0, name: `AES67-Bridge TX ${S.tx.length + 1}`, address: nextTxAddress(), port: 5004, channels: 2, pt: 98, ttl: 15, enabled: true };
+  openModal(`<div class="card-head">${icon("up")}<span class="title">${isNew ? "Add Transmit Stream" : "Edit Transmit Stream"}</span>
+    <div class="spacer"></div><button class="icon-btn" data-act="close">${icon("close")}</button></div>
+    <form class="card-body" id="txForm">
+    <div class="form-row"><label>Name</label><input type="text" name="name" value="${esc(t.name)}" required></div>
+    <div class="form-row"><label>Multicast address</label><input type="text" name="address" value="${esc(t.address)}" placeholder="239.69.0.1" required></div>
+    <div class="form-row"><label>RTP port</label><input type="number" name="port" value="${t.port}" min="1" max="65535"></div>
+    <div class="form-row"><label>Channels</label>${chSelect(t.channels)}</div>
+    <div class="form-row"><label>Payload Type</label><input type="number" name="pt" value="${t.pt}" min="96" max="127"></div>
+    <div class="form-row"><label>TTL</label><input type="number" name="ttl" value="${t.ttl}" min="1" max="255"></div>
+    <div class="form-row"><label>Format</label><span class="muted">L24 / 48 kHz / 1 ms</span></div>
+    </form><div class="modal-foot"><button class="btn ghost" data-act="close">Cancel</button>
+    <button class="btn" data-act="tx-save" data-id="${t.id}" data-enabled="${t.enabled}">Save</button></div>`);
+}
+
+function rxStatusBadge(r) {
+  if (!r.enabled) return `<span class="badge off">OFF</span>`;
+  if (r.error) return `<span class="badge err">ERROR</span>`;
+  return r.receiving ? `<span class="badge ok">(( • )) Receiving</span>` : `<span class="badge warn">No signal</span>`;
+}
+function pageRx() {
+  let h = `<div class="section-head">${icon("down")}<span>Receive · Sinks</span>
+    <div class="spacer"></div><button class="btn" data-act="rx-add">${icon("add")}Add</button></div>`;
+  if (!S.rx.length) h += `<div class="card"><div class="empty">No receive streams.</div></div>`;
+  h += `<div class="cols">`;
+  for (const r of S.rx) {
+    h += `<div class="card"><div class="card-head">${icon("aes")}<span class="title">${esc(r.name)}</span>${rxStatusBadge(r)}
+      <div class="spacer"></div>
+      <button class="icon-btn" title="Edit" data-act="rx-edit" data-id="${r.id}">${icon("edit")}</button>
+      <button class="icon-btn ${r.enabled ? "orange" : "green"}" title="${r.enabled ? "Pause" : "Start"}" data-act="rx-toggle" data-id="${r.id}">${icon(r.enabled ? "pause" : "play")}</button>
+      <button class="icon-btn red" title="Delete" data-act="rx-del" data-id="${r.id}">${icon("del")}</button></div>
+      <div class="card-body"><div class="muted" style="font-weight:700;letter-spacing:.06em;font-size:12px;margin-bottom:8px">INPUT</div>
+      <div class="kv"><div><span class="k">Addr</span><span class="mono">${esc(r.address)}:${r.port}</span></div>
+      <div><span class="k">Ch</span>${r.channels}ch</div><div><span class="k">PT</span>${r.pt}</div>
+      <div><span class="k">Delay</span>${r.delay_ms * 48} (${r.delay_ms.toFixed(1)}ms)</div>
+      <div><span class="k">Refclk</span>PTP</div><div><span class="k">Packets</span>${(r.packets || 0).toLocaleString()}</div></div>
+      ${r.error ? `<div class="err-line">${esc(r.error)}</div>` : ""}</div></div>`;
+  }
+  return h + `</div>`;
+}
+function openRxAdd() {
+  const subscribed = new Set(S.rx.map(r => `${r.address}:${r.port}`));
+  const rows = S.sap.map((s, i) => `<tr class="${s.local ? "local" : ""}"><td><b>${esc(s.name)}</b>${s.local ? " <span class='muted'>(this PC)</span>" : ""}</td>
+    <td class="mono">${esc(s.address)}:${s.port}</td><td>${s.channels}ch</td><td>PT${s.pt}</td>
+    <td style="text-align:right">${subscribed.has(`${s.address}:${s.port}`) ? `<span class="muted">Subscribed</span>` :
+      `<button class="btn" data-act="rx-add-sap" data-i="${i}">${icon("add")}Add</button>`}</td></tr>`).join("");
+  openModal(`<div class="card-head">${icon("down")}<span class="title">Add Receive Stream</span>
+    <div class="spacer"></div><button class="icon-btn" data-act="close">${icon("close")}</button></div>
+    <div class="card-body"><div class="section-head" style="margin-top:0">Discovered (${S.sap.length})</div>
+    ${S.sap.length ? `<table class="list"><thead><tr><th>Name</th><th>Address</th><th>Ch</th><th>PT</th><th></th></tr></thead><tbody>${rows}</tbody></table>`
+      : `<div class="empty">No sources found</div>`}
+    <div class="section-head">Manual</div>
+    <form id="rxForm">
+    <div class="form-row"><label>Name</label><input type="text" name="name" value="AES67 RX ${S.rx.length + 1}"></div>
+    <div class="form-row"><label>Multicast address</label><input type="text" name="address" placeholder="239.69.0.18"></div>
+    <div class="form-row"><label>RTP port</label><input type="number" name="port" value="5004"></div>
+    <div class="form-row"><label>Channels</label>${chSelect(2)}</div>
+    <div class="form-row"><label>Payload Type</label><input type="number" name="pt" value="98" min="96" max="127"></div>
+    <div class="form-row"><label>Delay (ms)</label><input type="number" name="delay_ms" value="4" min="1" max="500"></div>
+    </form></div><div class="modal-foot"><button class="btn ghost" data-act="close">Close</button>
+    <button class="btn" data-act="rx-save" data-id="0">Add manual</button></div>`);
+}
+function openRxEdit(r) {
+  openModal(`<div class="card-head">${icon("down")}<span class="title">Edit Receive Stream</span>
+    <div class="spacer"></div><button class="icon-btn" data-act="close">${icon("close")}</button></div>
+    <form class="card-body" id="rxForm">
+    <div class="form-row"><label>Name</label><input type="text" name="name" value="${esc(r.name)}"></div>
+    <div class="form-row"><label>Multicast address</label><input type="text" name="address" value="${esc(r.address)}"></div>
+    <div class="form-row"><label>RTP port</label><input type="number" name="port" value="${r.port}"></div>
+    <div class="form-row"><label>Channels</label>${chSelect(r.channels)}</div>
+    <div class="form-row"><label>Payload Type</label><input type="number" name="pt" value="${r.pt}" min="96" max="127"></div>
+    <div class="form-row"><label>Delay (ms)</label><input type="number" name="delay_ms" value="${r.delay_ms}" min="1" max="500"></div>
+    </form><div class="modal-foot"><button class="btn ghost" data-act="close">Cancel</button>
+    <button class="btn" data-act="rx-save" data-id="${r.id}">Save</button></div>`);
+}
+
+function devOptions(list, selected, prefix) {
+  return list.map(d => `<option value="${prefix}${esc(d.id)}" ${prefix + d.id === selected ? "selected" : ""}>
+    ${esc(d.name)}${d.default ? " (default)" : ""} — ${d.channels}ch ${d.rate ? (d.rate / 1000) + "kHz" : ""}</option>`).join("");
+}
+function pageDevices() {
+  const a = S.audio, x = S.asio;
+  const inSel = (a.input_loopback ? "L:" : "C:") + a.input_device;
+  const outSel = a.output_device;
+  const bufs = [64, 128, 256, 512, 1024, 2048];
+  return `<h2>${icon("dev")}Devices</h2><div class="cols wide">
+  <div class="card"><div class="card-head"><span class="tag wasapi">WASAPI</span><span class="title">Input</span><div class="spacer"></div>
+    <label class="switch"><input type="checkbox" id="inEn" ${a.input_enabled ? "checked" : ""}><span></span></label></div>
+    <div class="card-body"><div class="form-row"><label>Device</label><select id="inDev">
+      <optgroup label="Loopback (playback capture)"><option value="L:" ${inSel === "L:" ? "selected" : ""}>Default output (loopback)</option>${devOptions(DEV.render, inSel, "L:")}</optgroup>
+      <optgroup label="Capture devices"><option value="C:" ${inSel === "C:" ? "selected" : ""}>Default input</option>${devOptions(DEV.capture, inSel, "C:")}</optgroup>
+    </select></div>
+    <div>${devLine(a.input, a.input_enabled)}</div></div></div>
+  <div class="card"><div class="card-head"><span class="tag wasapi">WASAPI</span><span class="title">Output</span><div class="spacer"></div>
+    <label class="switch"><input type="checkbox" id="outEn" ${a.output_enabled ? "checked" : ""}><span></span></label></div>
+    <div class="card-body"><div class="form-row"><label>Device</label><select id="outDev">
+      <option value="" ${outSel === "" ? "selected" : ""}>Default output</option>${devOptions(DEV.render, outSel, "")}
+    </select></div>
+    <div>${devLine(a.output, a.output_enabled)}</div></div></div>
+  <div class="card"><div class="card-head"><span class="tag asio">ASIO</span><span class="title">ASIO Driver</span></div>
+    <div class="card-body">
+    <div class="kv" style="margin-bottom:12px"><div><span class="k">Registered</span>${x.registered ? `<span class="badge ok">Yes</span>` : `<span class="badge warn">No</span>`}</div>
+    <div><span class="k">Channels</span>32 in / 32 out</div><div><span class="k">Clock</span>PTP</div></div>
+    <div class="form-row"><label>Preferred buffer</label><select id="asioBuf">${bufs.map(b => `<option value="${b}" ${b === x.preferred ? "selected" : ""}>${b} samples (${(b / 48).toFixed(1)} ms)</option>`).join("")}</select></div>
+    <div class="muted" style="margin-bottom:12px">Applies when the DAW reopens the driver.</div>
+    ${x.registered ? `<button class="btn ghost" data-act="asio-unreg">Unregister</button>` : `<button class="btn" data-act="asio-reg">Register (admin)</button>`}
+    </div></div>
+  </div>
+  <div style="margin-top:6px"><button class="btn ghost" data-act="refresh-devices">${icon("refresh")}Refresh devices</button></div>`;
+}
+
+function openModal(html) {
+  document.getElementById("modal").innerHTML = html;
+  document.getElementById("modalBg").classList.add("open");
+}
+function closeModal() { document.getElementById("modalBg").classList.remove("open"); }
+document.getElementById("modalBg").addEventListener("mousedown", e => { if (e.target.id === "modalBg") closeModal(); });
+function formData(id) {
+  const f = document.getElementById(id), o = {};
+  for (const el of f.elements) if (el.name) o[el.name] = el.type === "number" || el.name === "channels" ? Number(el.value) : el.value.trim();
+  return o;
+}
+
+document.body.addEventListener("click", async e => {
+  const t = e.target.closest("[data-act],[data-x],[data-toggle],[data-expand]");
+  if (!t) return;
+  if (t.dataset.x) {
+    const [src, sc, dst, dc] = t.dataset.x.split("|");
+    const onNow = !t.classList.contains("on");
+    t.classList.toggle("on", onNow);
+    send("route_set", { src, sc: +sc, dst, dc: +dc, on: onNow });
+    return;
+  }
+  if (t.dataset.toggle) {
+    collapsed[t.dataset.toggle] = !isCollapsed(t.dataset.toggle);
+    store.set("collapsed", JSON.stringify(collapsed)); render(true); return;
+  }
+  if (t.dataset.expand) {
+    for (const k of t.dataset.expand.split(",")) collapsed[k] = false;
+    store.set("collapsed", JSON.stringify(collapsed)); render(true); return;
+  }
+  const id = +t.dataset.id;
+  switch (t.dataset.act) {
+    case "close": closeModal(); break;
+    case "collapse-all":
+      for (const p of S.ports.src) collapsed[gkey("s", p.id)] = true;
+      for (const p of S.ports.dst) collapsed[gkey("d", p.id)] = true;
+      store.set("collapsed", JSON.stringify(collapsed)); render(true); break;
+    case "expand-all":
+      for (const p of S.ports.src) collapsed[gkey("s", p.id)] = false;
+      for (const p of S.ports.dst) collapsed[gkey("d", p.id)] = false;
+      store.set("collapsed", JSON.stringify(collapsed)); render(true); break;
+    case "tx-add": openTxForm(null); break;
+    case "tx-edit": openTxForm(S.tx.find(x => x.id === id)); break;
+    case "tx-sdp": {
+      const tx = S.tx.find(x => x.id === id);
+      openModal(`<div class="card-head">${icon("code")}<span class="title">SDP — ${esc(tx.name)}</span><div class="spacer"></div>
+        <button class="icon-btn" data-act="close">${icon("close")}</button></div>
+        <div class="card-body"><pre class="sdp">${esc(tx.sdp || "(stream not running)")}</pre></div>`);
+      break;
+    }
+    case "tx-save": {
+      const d = formData("txForm");
+      const r = await send("tx_save", { stream: { id, enabled: t.dataset.enabled !== "false", ...d } });
+      if (r.ok) { closeModal(); toast("Saved"); }
+      break;
+    }
+    case "tx-toggle": { const tx = S.tx.find(x => x.id === id); send("tx_enable", { id, enabled: !tx.enabled }); break; }
+    case "tx-del": {
+      const tx = S.tx.find(x => x.id === id);
+      if (confirm(`Delete '${tx.name}'?`)) send("tx_delete", { id });
+      break;
+    }
+    case "rx-add": openRxAdd(); break;
+    case "rx-add-sap": {
+      const s = S.sap[+t.dataset.i];
+      const r = await send("rx_save", { stream: { id: 0, name: s.name, address: s.address, port: s.port,
+        channels: Math.min(8, s.channels || 2), pt: s.pt || 98, delay_ms: 4, enabled: true } });
+      if (r.ok) { closeModal(); toast(`Subscribed to '${s.name}'`); }
+      break;
+    }
+    case "rx-edit": openRxEdit(S.rx.find(x => x.id === id)); break;
+    case "rx-save": {
+      const d = formData("rxForm");
+      const cur = S.rx.find(x => x.id === id);
+      const r = await send("rx_save", { stream: { id, enabled: cur ? cur.enabled : true, ...d } });
+      if (r.ok) { closeModal(); toast("Saved"); }
+      break;
+    }
+    case "rx-toggle": { const rx = S.rx.find(x => x.id === id); send("rx_enable", { id, enabled: !rx.enabled }); break; }
+    case "rx-del": {
+      const rx = S.rx.find(x => x.id === id);
+      if (confirm(`Delete '${rx.name}'?`)) send("rx_delete", { id });
+      break;
+    }
+    case "asio-reg": send("asio_register").then(r => r.ok && toast("ASIO driver registered")); break;
+    case "asio-unreg": send("asio_unregister").then(r => r.ok && toast("ASIO driver unregistered")); break;
+    case "refresh-devices": send("refresh_devices").then(() => toast("Devices refreshed")); break;
+  }
+});
+document.body.addEventListener("change", e => {
+  const id = e.target.id;
+  if (id === "inEn" || id === "inDev" || id === "outEn" || id === "outDev") {
+    const inDev = document.getElementById("inDev").value;
+    send("audio_save", {
+      input_enabled: document.getElementById("inEn").checked,
+      input_loopback: inDev.startsWith("L:"), input_device: inDev.slice(2),
+      output_enabled: document.getElementById("outEn").checked,
+      output_device: document.getElementById("outDev").value,
+    }).then(r => r.ok && toast("Applied"));
+  } else if (id === "asioBuf") {
+    send("asio_save", { preferred_buffer: +e.target.value });
+  }
+});
+document.addEventListener("keydown", e => { if (e.key === "Escape") closeModal(); });
+
+function mockHandle(m) {
+  setTimeout(() => {
+    onHostMessage({ type: "result", rid: m.rid, ok: true });
+    if (m.cmd === "route_set") {
+      const k = r => `${r.src}|${r.sc}|${r.dst}|${r.dc}`, key = k(m);
+      S.routes = S.routes.filter(r => k(r) !== key); if (m.on) S.routes.push({ src: m.src, sc: m.sc, dst: m.dst, dc: m.dc });
+      render();
+    }
+  }, 30);
+}
+if (!host) {
+  S = { type: "state", node: { name: "AES67-Bridge", ip: "192.168.10.123" },
+    ptp: { lock: "locked", gmid: "2C-CF-67-FF-FE-EB-E3-ED", domain: 0 },
+    tx: [{ id: 1, enabled: true, name: "AES67-Bridge TX", channels: 2, address: "239.69.0.1", port: 5004, pt: 98, ttl: 15, running: true, packets: 123456, sdp: "v=0\r\n..." },
+         { id: 2, enabled: true, name: "DAW Bus 1-8", channels: 8, address: "239.69.0.2", port: 5004, pt: 98, ttl: 15, running: true, packets: 99 }],
+    rx: [{ id: 1, enabled: true, name: "AOIP 1-8", channels: 8, address: "239.69.0.18", port: 5004, pt: 98, delay_ms: 4, running: true, receiving: true, packets: 5000 },
+         { id: 2, enabled: true, name: "OMNI512p-ACADE2-A : 128", channels: 2, address: "239.69.52.17", port: 5004, pt: 97, delay_ms: 4, running: true, receiving: false, packets: 0 }],
+    sap: [{ name: "AOIP 1-8", address: "239.69.0.18", port: 5004, channels: 8, pt: 98, local: false },
+          { name: "AES67-TX-1", address: "239.69.7.12", port: 5004, channels: 8, pt: 96, local: false },
+          { name: "AES67-Bridge TX", address: "239.69.0.1", port: 5004, channels: 2, pt: 98, local: true }],
+    audio: { input_enabled: true, input_device: "", input_loopback: true, output_enabled: true, output_device: "",
+      input: { running: true, channels: 2, rate: 48000, name: "Speakers (Realtek)", error: "" },
+      output: { running: true, channels: 2, rate: 44100, name: "Speakers (Realtek)", error: "" } },
+    asio: { registered: true, preferred: 256 },
+    ports: { src: [{ id: "wasapi", group: "wasapi", name: "WASAPI In", channels: 2, active: true },
+                   { id: "asio", group: "asio", name: "ASIO Out (from DAW)", channels: 32, active: true },
+                   { id: "rx1", group: "aes", name: "AOIP 1-8", channels: 8, active: true },
+                   { id: "rx2", group: "aes", name: "OMNI512p-ACADE2-A : 128", channels: 2, active: true }],
+             dst: [{ id: "tx1", group: "aes", name: "AES67-Bridge TX", channels: 2, active: true },
+                   { id: "tx2", group: "aes", name: "DAW Bus 1-8", channels: 8, active: true },
+                   { id: "wasapi", group: "wasapi", name: "WASAPI Out", channels: 2, active: true },
+                   { id: "asio", group: "asio", name: "ASIO In (to DAW)", channels: 32, active: true }] },
+    routes: [{ src: "wasapi", sc: 0, dst: "tx1", dc: 0 }, { src: "wasapi", sc: 1, dst: "tx1", dc: 1 },
+             { src: "rx1", sc: 0, dst: "wasapi", dc: 0 }, { src: "rx1", sc: 1, dst: "wasapi", dc: 1 },
+             { src: "asio", sc: 0, dst: "tx2", dc: 0 }, { src: "asio", sc: 1, dst: "tx2", dc: 1 },
+             { src: "rx1", sc: 2, dst: "asio", dc: 0 }] };
+  DEV = { render: [{ id: "r1", name: "Speakers (Realtek)", default: true, channels: 2, rate: 48000 }],
+          capture: [{ id: "c1", name: "Microphone (USB)", default: true, channels: 1, rate: 48000 }] };
+}
+
+renderNav();
+render(true);
+if (host) send("hello");
+</script>
+</body>
+</html>
