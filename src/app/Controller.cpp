@@ -109,13 +109,17 @@ Controller::Controller(std::filesystem::path config_path, AppConfig cfg)
 Controller::~Controller() { Stop(); }
 
 bool Controller::Start() {
+  net_ = ResolveNetIf(cfg_.network.interface_id, cfg_.network.interface_ip, &net_auto_);
+  LOGI("net: %s %s (%s)%s", net_.name.c_str(), net_.ip.c_str(), net_.mac_text.c_str(),
+       net_auto_ ? " [auto]" : "");
   ptp_ = std::make_unique<PtpClient>();
   engine_ = std::make_unique<AudioEngine>();
-  engine_->Init(ptp_.get(), (uint8_t)cfg_.ptp.domain, cfg_.sap, cfg_.asio);
+  engine_->Init(ptp_.get(), (uint8_t)cfg_.ptp.domain, cfg_.sap, cfg_.asio, net_.ip_host);
 
   AudioEngine* eng = engine_.get();
   std::string err;
-  if (!ptp_->Start(0, (uint8_t)cfg_.ptp.domain, [eng] { eng->OnTic(); }, &err))
+  if (!ptp_->Start(htonl(net_.ip_host), net_.has_mac ? net_.mac : nullptr,
+                   (uint8_t)cfg_.ptp.domain, [eng] { eng->OnTic(); }, &err))
     LOGW("ptp: start failed: %s", err.c_str());
 
   engine_->ApplyAudio(cfg_.audio);
@@ -124,7 +128,8 @@ bool Controller::Start() {
   engine_->SetRoutes(cfg_.routes);
 
   sap_listener_ = std::make_unique<SapListener>();
-  if (!sap_listener_->Start(0, &err)) LOGW("sap listener start failed: %s", err.c_str());
+  if (!sap_listener_->Start(net_.ip_host, &err))
+    LOGW("sap listener start failed: %s", err.c_str());
   return true;
 }
 
@@ -371,6 +376,19 @@ std::string Controller::HandleCommand(const std::string& text, bool* send_device
       engine_->SetRoutes(cfg_.routes);
       Persist();
 
+    } else if (cmd == "network_save") {
+      const std::string id = m.value("interface_id", "");
+      std::string ip;
+      for (const auto& n : EnumNetIfs())
+        if (n.id == id) ip = n.ip;
+      if (!id.empty() && ip.empty()) throw std::runtime_error("Network interface not found");
+      cfg_.network.interface_id = id;
+      cfg_.network.interface_ip = ip;
+      Persist();
+      LOGI("ui: network interface -> %s", id.empty() ? "auto" : ip.c_str());
+      Stop();
+      Start();
+
     } else if (cmd == "asio_save") {
       const int b = m.value("preferred_buffer", cfg_.asio.preferred_buffer);
       cfg_.asio.preferred_buffer = (int)aes67asio::NormalizeBuffer((uint32_t)std::max(b, 1));
@@ -395,6 +413,13 @@ std::string Controller::StateJson() const {
   const AudioEngine::Status st = engine_ ? engine_->GetStatus() : AudioEngine::Status{};
 
   j["node"] = {{"name", cfg_.node.name}, {"ip", IpText(st.local_ip)}};
+  j["network"] = {{"interface_id", cfg_.network.interface_id},
+                  {"auto", net_auto_},
+                  {"name", net_.name},
+                  {"ip", net_.ip},
+                  {"mac", net_.mac_text},
+                  {"speed", net_.speed_bps},
+                  {"clock_id", ptp_ ? ptp_->ClockId() : ""}};
   if (ptp_) {
     PtpInfo info = ptp_->GetInfo();
     j["ptp"] = {{"lock", PtpText(info.lock)}, {"gmid", info.gmid},
@@ -499,7 +524,13 @@ std::string Controller::DevicesJson() const {
                    {"channels", d.channels}, {"rate", d.rate}});
     return a;
   };
-  return Dump(json{{"type", "devices"}, {"render", list(true)}, {"capture", list(false)}});
+  json nics = json::array();
+  for (const auto& n : EnumNetIfs())
+    nics.push_back({{"id", n.id}, {"name", n.name}, {"description", n.description},
+                    {"ip", n.ip}, {"mac", n.mac_text}, {"speed", n.speed_bps},
+                    {"wireless", n.wireless}});
+  return Dump(json{{"type", "devices"}, {"render", list(true)}, {"capture", list(false)},
+                   {"nics", nics}});
 }
 
 std::wstring Controller::Tooltip() const {

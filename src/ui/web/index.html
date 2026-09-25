@@ -277,7 +277,7 @@ function pageInputs() {
     case "matrix": return [S.ports, S.routes, collapsed];
     case "tx": return [S.tx, S.ptp];
     case "rx": return [S.rx, S.sap.length];
-    case "devices": return [S.audio, S.asio, DEV];
+    case "devices": return [S.audio, S.asio, S.network, DEV];
     default: return [S];
   }
 }
@@ -298,7 +298,8 @@ function pageStatus() {
     <span class="badge ${p.lock === "locked" ? "ok" : p.lock === "locking" ? "warn" : "err"}">${esc(p.lock)}</span></div>
     <div class="card-body kv"><div><span class="k">Grandmaster</span><span class="mono">${esc(p.gmid || "-")}</span></div>
     <div><span class="k">Domain</span>${p.domain ?? 0}</div><div><span class="k">Role</span>Slave</div>
-    <div><span class="k">IP</span>${esc(S.node.ip)}</div></div></div>
+    <div><span class="k">Interface</span>${esc((S.network && S.network.name) || "-")} · ${esc(S.node.ip)}</div>
+    <div><span class="k">Clock ID</span><span class="mono">${esc((S.network && S.network.clock_id) || "-")}</span></div></div></div>
   <div class="card"><div class="card-head">${icon("aes")}<span class="title">AES67 Streams</span></div>
     <div class="card-body kv"><div><span class="k">TX</span>${txOn} / ${S.tx.length} running</div>
     <div><span class="k">RX</span>${rxOn} / ${S.rx.length} receiving</div>
@@ -511,12 +512,29 @@ function devOptions(list, selected, prefix) {
   return list.map(d => `<option value="${prefix}${esc(d.id)}" ${prefix + d.id === selected ? "selected" : ""}>
     ${esc(d.name)}${d.default ? " (default)" : ""} — ${d.channels}ch ${d.rate ? (d.rate / 1000) + "kHz" : ""}</option>`).join("");
 }
+function speedText(b) {
+  if (!b) return "";
+  return b >= 1e9 ? `${(b / 1e9).toFixed(b % 1e9 ? 1 : 0)} Gbps` : `${Math.round(b / 1e6)} Mbps`;
+}
+function nicLabel(n) {
+  return `${n.name} — ${n.ip}${n.speed ? " — " + speedText(n.speed) : ""}${n.wireless ? " (Wi-Fi)" : ""}`;
+}
 function pageDevices() {
-  const a = S.audio, x = S.asio;
+  const a = S.audio, x = S.asio, net = S.network || {};
+  const nics = DEV.nics || [];
   const inSel = (a.input_loopback ? "L:" : "C:") + a.input_device;
   const outSel = a.output_device;
   const bufs = [64, 128, 256, 512, 1024, 2048];
   return `<h2>${icon("dev")}Devices</h2><div class="cols wide">
+  <div class="card"><div class="card-head">${icon("ptp")}<span class="title">Network</span></div>
+    <div class="card-body"><div class="form-row"><label>Interface</label><select id="nicSel">
+      <option value="" ${!net.interface_id ? "selected" : ""}>Auto (default route)</option>
+      ${nics.map(n => `<option value="${esc(n.id)}" ${n.id === net.interface_id ? "selected" : ""}>${esc(nicLabel(n))}</option>`).join("")}
+    </select></div>
+    <div class="kv"><div><span class="k">In use</span>${esc(net.name || "-")} · <span class="mono">${esc(net.ip || "-")}</span></div>
+    <div><span class="k">MAC</span><span class="mono">${esc(net.mac || "-")}</span></div>
+    <div><span class="k">PTP clock ID</span><span class="mono">${esc(net.clock_id || "-")}</span></div></div>
+    <div class="muted" style="margin-top:10px">AES67 streams, SAP and PTP use this interface.</div></div></div>
   <div class="card"><div class="card-head"><span class="tag wasapi">WASAPI</span><span class="title">Input</span><div class="spacer"></div>
     <label class="switch"><input type="checkbox" id="inEn" ${a.input_enabled ? "checked" : ""}><span></span></label></div>
     <div class="card-body"><div class="form-row"><label>Device</label><select id="inDev">
@@ -641,6 +659,9 @@ document.body.addEventListener("change", e => {
       output_enabled: document.getElementById("outEn").checked,
       output_device: document.getElementById("outDev").value,
     }).then(r => r.ok && toast("Applied"));
+  } else if (id === "nicSel") {
+    toast("Restarting on the selected interface…");
+    send("network_save", { interface_id: e.target.value }).then(r => r.ok && toast("Network interface applied"));
   } else if (id === "asioBuf") {
     send("asio_save", { preferred_buffer: +e.target.value });
   }
@@ -683,7 +704,10 @@ if (!host) {
              { src: "rx1", sc: 0, dst: "wasapi", dc: 0 }, { src: "rx1", sc: 1, dst: "wasapi", dc: 1 },
              { src: "asio", sc: 0, dst: "tx2", dc: 0 }, { src: "asio", sc: 1, dst: "tx2", dc: 1 },
              { src: "rx1", sc: 2, dst: "asio", dc: 0 }] };
-  DEV = { render: [{ id: "r1", name: "Speakers (Realtek)", default: true, channels: 2, rate: 48000 }],
+  S.network = { interface_id: "", auto: true, name: "Ethernet", ip: "192.168.10.123", mac: "C8:A3:62:12:34:56", speed: 1e9, clock_id: "C8-A3-62-FF-FE-12-34-56" };
+  DEV = { nics: [{ id: "{A}", name: "Ethernet", ip: "192.168.10.123", mac: "C8:A3:62:12:34:56", speed: 1e9, wireless: false },
+                 { id: "{B}", name: "Wi-Fi", ip: "10.0.0.5", mac: "AA:BB:CC:00:11:22", speed: 866700000, wireless: true }],
+          render: [{ id: "r1", name: "Speakers (Realtek)", default: true, channels: 2, rate: 48000 }],
           capture: [{ id: "c1", name: "Microphone (USB)", default: true, channels: 1, rate: 48000 }] };
 }
 

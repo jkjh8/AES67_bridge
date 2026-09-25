@@ -91,6 +91,11 @@ bool SapAnnouncer::Start(std::function<std::string()> sdp_provider,
   DWORD ttl = 32;
   setsockopt(impl_->sock, IPPROTO_IP, IP_MULTICAST_TTL, (const char*)&ttl,
              sizeof(ttl));
+  if (origin_ip_host) {
+    in_addr ifa;
+    ifa.s_addr = htonl(origin_ip_host);
+    setsockopt(impl_->sock, IPPROTO_IP, IP_MULTICAST_IF, (const char*)&ifa, sizeof(ifa));
+  }
 
   impl_->running = true;
   impl_->thread = std::thread([this] {

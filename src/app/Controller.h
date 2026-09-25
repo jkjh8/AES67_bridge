@@ -4,6 +4,7 @@
 #include <memory>
 #include <string>
 
+#include "common/NetIf.h"
 #include "common/Types.h"
 
 namespace aes67 {
@@ -38,6 +39,8 @@ class Controller {
   std::unique_ptr<AudioEngine> engine_;
   std::unique_ptr<SapListener> sap_listener_;
   int last_ptp_lock_ = -1;
+  NetIf net_;
+  bool net_auto_ = true;
   int tick_count_ = 0;
 };
 

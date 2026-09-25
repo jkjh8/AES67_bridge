@@ -21,7 +21,7 @@ class AudioEngine {
   AudioEngine& operator=(const AudioEngine&) = delete;
 
   void Init(PtpClient* ptp, uint8_t ptp_domain, const SapConfig& sap,
-            const AsioConfig& asio);
+            const AsioConfig& asio, uint32_t iface_ip_host);
   void Shutdown();
 
   void OnTic();

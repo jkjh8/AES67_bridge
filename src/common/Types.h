@@ -18,6 +18,7 @@ struct NodeConfig {
 };
 
 struct NetworkConfig {
+  std::string interface_id;
   std::string interface_ip;
   int ip_ttl = 15;
 };

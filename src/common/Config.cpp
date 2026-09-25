@@ -26,6 +26,7 @@ NodeConfig NodeFrom(const json& j) {
 }
 NetworkConfig NetworkFrom(const json& j) {
   NetworkConfig c;
+  c.interface_id = j.value("interface_id", c.interface_id);
   c.interface_ip = j.value("interface_ip", c.interface_ip);
   c.ip_ttl = j.value("ip_ttl", c.ip_ttl);
   return c;
@@ -102,7 +103,9 @@ json ToJson(const AppConfig& c) {
       {"version", c.version},
       {"node", {{"name", c.node.name}}},
       {"network",
-       {{"interface_ip", c.network.interface_ip}, {"ip_ttl", c.network.ip_ttl}}},
+       {{"interface_id", c.network.interface_id},
+        {"interface_ip", c.network.interface_ip},
+        {"ip_ttl", c.network.ip_ttl}}},
       {"ptp", {{"domain", c.ptp.domain}, {"dscp", c.ptp.dscp}}},
       {"tx_streams", tx},
       {"rx_streams", rx},

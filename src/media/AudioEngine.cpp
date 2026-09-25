@@ -243,13 +243,13 @@ AudioEngine::AudioEngine() : impl_(std::make_unique<Impl>()) {}
 AudioEngine::~AudioEngine() { Shutdown(); }
 
 void AudioEngine::Init(PtpClient* ptp, uint8_t ptp_domain, const SapConfig& sap,
-                       const AsioConfig& asio) {
+                       const AsioConfig& asio, uint32_t iface_ip_host) {
   WSADATA wsa;
   WSAStartup(MAKEWORD(2, 2), &wsa);
   impl_->ptp = ptp;
   impl_->domain = ptp_domain;
   impl_->sap_cfg = sap;
-  impl_->local_ip = LocalIpv4Host();
+  impl_->local_ip = iface_ip_host ? iface_ip_host : LocalIpv4Host();
   std::string err;
   if (!impl_->asio.Open((uint32_t)asio.preferred_buffer, &err))
     LOGW("asio: shared memory unavailable: %s", err.c_str());

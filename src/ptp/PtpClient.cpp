@@ -526,8 +526,8 @@ void PtpClient::Impl::TicLoop() {
 PtpClient::PtpClient() : impl_(std::make_unique<Impl>()) {}
 PtpClient::~PtpClient() { Stop(); }
 
-bool PtpClient::Start(uint32_t ifaceIpBE, uint8_t domain, std::function<void()> onTic,
-                      std::string* err) {
+bool PtpClient::Start(uint32_t ifaceIpBE, const uint8_t* mac, uint8_t domain,
+                      std::function<void()> onTic, std::string* err) {
   WSADATA wsa;
   WSAStartup(MAKEWORD(2, 2), &wsa);
   timeBeginPeriod(1);
@@ -540,12 +540,17 @@ bool PtpClient::Start(uint32_t ifaceIpBE, uint8_t domain, std::function<void()> 
   im->domain = domain;
   im->on_tic = std::move(onTic);
 
-  LARGE_INTEGER seed;
-  QueryPerformanceCounter(&seed);
-  const uint32_t ip = ntohl(ifaceIpBE);
-  const uint8_t id[8] = {0x02, (uint8_t)(ip >> 24), (uint8_t)(ip >> 16), 0xFF, 0xFE,
-                         (uint8_t)(ip >> 8), (uint8_t)ip, (uint8_t)(seed.QuadPart & 0xFF)};
-  memcpy(im->self.b, id, 8);
+  if (mac) {
+    const uint8_t id[8] = {mac[0], mac[1], mac[2], 0xFF, 0xFE, mac[3], mac[4], mac[5]};
+    memcpy(im->self.b, id, 8);
+  } else {
+    LARGE_INTEGER seed;
+    QueryPerformanceCounter(&seed);
+    const uint32_t ip = ntohl(ifaceIpBE);
+    const uint8_t id[8] = {0x02, (uint8_t)(ip >> 24), (uint8_t)(ip >> 16), 0xFF, 0xFE,
+                           (uint8_t)(ip >> 8), (uint8_t)ip, (uint8_t)(seed.QuadPart & 0xFF)};
+    memcpy(im->self.b, id, 8);
+  }
   im->self.b[8] = 0;
   im->self.b[9] = 1;
 
@@ -555,7 +560,10 @@ bool PtpClient::Start(uint32_t ifaceIpBE, uint8_t domain, std::function<void()> 
   im->running = true;
   im->tic_thread = std::thread([im] { im->TicLoop(); });
   im->rx_thread = std::thread([im] { im->RxLoop(); });
-  LOGI("ptp: started (domain=%u)", domain);
+  in_addr ia;
+  ia.s_addr = ifaceIpBE;
+  LOGI("ptp: started on %s (domain=%u, clock id %s)", inet_ntoa(ia), domain,
+       FormatId(im->self.b).c_str());
   return true;
 }
 
@@ -592,6 +600,8 @@ std::string PtpClient::Diag() const {
            impl_->npts, impl_->kernel_ts_seen ? "kernel" : "user");
   return b;
 }
+
+std::string PtpClient::ClockId() const { return FormatId(impl_->self.b); }
 
 uint64_t PtpClient::GlobalSac() const {
   const uint64_t t = GlobalTime();

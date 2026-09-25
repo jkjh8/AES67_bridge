@@ -22,8 +22,8 @@ class PtpClient {
   PtpClient(const PtpClient&) = delete;
   PtpClient& operator=(const PtpClient&) = delete;
 
-  bool Start(uint32_t ifaceIpBE, uint8_t domain, std::function<void()> onTic,
-             std::string* err);
+  bool Start(uint32_t ifaceIpBE, const uint8_t* mac, uint8_t domain,
+             std::function<void()> onTic, std::string* err);
   void Stop();
 
   PtpInfo GetInfo() const;
@@ -31,6 +31,7 @@ class PtpClient {
   uint64_t GlobalSac() const;
   uint64_t GlobalTime() const;
   std::string Diag() const;
+  std::string ClockId() const;
 
  private:
   struct Impl;

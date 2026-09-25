@@ -1,6 +1,7 @@
 set(APP_SOURCES
   common/Config.cpp
   common/Log.cpp
+  common/NetIf.cpp
   ptp/PtpClient.cpp
   media/TxStream.cpp
   media/RxStream.cpp
