@@ -5,6 +5,7 @@
 #include <shellapi.h>
 
 #include <algorithm>
+#include <set>
 
 #include <json.hpp>
 
@@ -235,6 +236,7 @@ std::string Controller::HandleCommand(const std::string& text, bool* send_device
       }
       t.name = s.value("name", t.name);
       t.address = s.value("address", t.address);
+      if (t.address.empty() || t.address == "auto") t.address = NextTxAddress(t.id);
       t.rtp_port = s.value("port", t.rtp_port);
       t.channels = s.value("channels", t.channels);
       t.payload_type = s.value("pt", t.payload_type);
@@ -244,6 +246,11 @@ std::string Controller::HandleCommand(const std::string& text, bool* send_device
       for (const auto& o : cfg_.tx)
         if (o.id != t.id && o.address == t.address && o.rtp_port == t.rtp_port)
           throw std::runtime_error("Address/port already used by '" + o.name + "'");
+      for (const auto& o : cfg_.rx)
+        if (o.address == t.address)
+          throw std::runtime_error("Address is received from the network ('" + o.name + "')");
+      if (auto u = NetworkUserOf(t.address); !u.empty())
+        throw std::runtime_error("Address already used on the network by " + u);
       if (t.id == 0) {
         int mx = 0;
         for (const auto& o : cfg_.tx) mx = std::max(mx, o.id);
@@ -392,7 +399,7 @@ std::string Controller::HandleCommand(const std::string& text, bool* send_device
 
     } else if (cmd == "rx_delay_save") {
       const int d = m.value("delay_ms", cfg_.rx_delay_ms);
-      if (d < kMinRxDelayMs || d > kMaxRxDelayMs) throw std::runtime_error("delay must be 4..10 ms");
+      if (SnapRxDelayMs(d) != d) throw std::runtime_error("delay must be 4, 6, 8 or 10 ms");
       cfg_.rx_delay_ms = d;
       engine_->SetRxDelay(d);
       for (const auto& r : cfg_.rx) engine_->ApplyRx(r, nullptr);
@@ -417,6 +424,32 @@ std::string Controller::HandleCommand(const std::string& text, bool* send_device
     fail(e.what());
   }
   return Dump(reply);
+}
+
+std::string Controller::NetworkUserOf(const std::string& address) const {
+  if (!sap_listener_) return "";
+  for (const auto& s : sap_listener_->Sources())
+    if (s.address == address && s.origin != net_.ip) return "'" + s.name + "' (" + s.origin + ")";
+  return "";
+}
+
+std::string Controller::NextTxAddress(int exclude_id) const {
+  std::set<std::string> used;
+  for (const auto& t : cfg_.tx)
+    if (t.id != exclude_id) used.insert(t.address);
+  for (const auto& r : cfg_.rx) used.insert(r.address);
+  if (sap_listener_)
+    for (const auto& s : sap_listener_->Sources())
+      if (s.origin != net_.ip) used.insert(s.address);
+  uint32_t h = 2166136261u;
+  for (int i = 0; i < 6; ++i) h = (h ^ net_.mac[i]) * 16777619u;
+  const int block = net_.has_mac ? (int)((h ^ (h >> 8) ^ (h >> 16) ^ (h >> 24)) & 0xFF) : 0;
+  for (int b = 0; b < 256; ++b)
+    for (int y = 1; y < 255; ++y) {
+      const std::string a = "239.69." + std::to_string((block + b) & 0xFF) + "." + std::to_string(y);
+      if (!used.count(a)) return a;
+    }
+  return "239.69.0.1";
 }
 
 std::string Controller::StateJson() const {
@@ -447,9 +480,11 @@ std::string Controller::StateJson() const {
         o["error"] = s.error;
         o["sdp"] = s.sdp;
       }
+    o["conflict"] = NetworkUserOf(t.address);
     tx.push_back(o);
   }
   j["tx"] = tx;
+  j["tx_next_address"] = NextTxAddress(0);
 
   json rx = json::array();
   for (const auto& r : cfg_.rx) {
@@ -469,8 +504,9 @@ std::string Controller::StateJson() const {
   if (sap_listener_)
     for (const auto& s : sap_listener_->Sources()) {
       bool local = false;
-      for (const auto& t : cfg_.tx)
-        if (t.address == s.address && t.rtp_port == s.port) local = true;
+      if (s.origin == net_.ip)
+        for (const auto& t : cfg_.tx)
+          if (t.address == s.address && t.rtp_port == s.port) local = true;
       sap.push_back({{"name", s.name}, {"address", s.address}, {"port", s.port},
                      {"channels", s.channels}, {"pt", s.payload_type},
                      {"local", local}});

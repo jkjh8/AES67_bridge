@@ -82,7 +82,10 @@ void SapListener::Impl::RecvLoop() {
     SapSource s;
     if (!ParseSdp(pkt.substr(v), &s)) continue;
     s.last_seen_ms = GetTickCount64();
-    const std::string key = s.address + ":" + std::to_string(s.port);
+    char org[INET_ADDRSTRLEN] = {};
+    inet_ntop(AF_INET, &from.sin_addr, org, sizeof(org));
+    s.origin = org;
+    const std::string key = s.origin + " " + s.address + ":" + std::to_string(s.port);
     std::lock_guard<std::mutex> lk(mtx);
     const bool isNew = sources.find(key) == sources.end();
     sources[key] = s;

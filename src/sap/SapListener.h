@@ -10,6 +10,7 @@ namespace aes67 {
 struct SapSource {
   std::string name;
   std::string address;
+  std::string origin;
   int port = 5004;
   int channels = 0;
   int payload_type = 0;

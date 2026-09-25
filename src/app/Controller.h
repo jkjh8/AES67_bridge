@@ -32,6 +32,8 @@ class Controller {
  private:
   void Persist();
   void PruneRoutes();
+  std::string NextTxAddress(int exclude_id) const;
+  std::string NetworkUserOf(const std::string& address) const;
 
   std::filesystem::path config_path_;
   AppConfig cfg_;

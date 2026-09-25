@@ -42,6 +42,13 @@ struct TxConfig {
 
 inline constexpr int kMinRxDelayMs = 4;
 inline constexpr int kMaxRxDelayMs = 10;
+inline constexpr int kRxDelayChoicesMs[] = {4, 6, 8, 10};
+
+inline int SnapRxDelayMs(int ms) {
+  for (int c : kRxDelayChoicesMs)
+    if (ms <= c) return c;
+  return kMaxRxDelayMs;
+}
 
 struct RxConfig {
   int id = 0;

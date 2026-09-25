@@ -130,7 +130,7 @@ AppConfig FromJson(const json& j) {
   if (j.contains("network")) c.network = NetworkFrom(j["network"]);
   if (j.contains("ptp")) c.ptp = PtpFrom(j["ptp"]);
   if (j.contains("sap")) c.sap = SapFrom(j["sap"]);
-  c.rx_delay_ms = std::clamp(j.value("rx_delay_ms", c.rx_delay_ms), kMinRxDelayMs, kMaxRxDelayMs);
+  c.rx_delay_ms = SnapRxDelayMs(j.value("rx_delay_ms", c.rx_delay_ms));
   if (j.contains("audio")) c.audio = AudioFrom(j["audio"]);
   if (j.contains("asio"))
     c.asio.preferred_buffer = j["asio"].value("preferred_buffer", c.asio.preferred_buffer);

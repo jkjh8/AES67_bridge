@@ -418,20 +418,19 @@ function pageTx() {
       <div><span class="k">Ch</span>${t.channels}ch</div><div><span class="k">PT</span>${t.pt}</div><div><span class="k">TTL</span>${t.ttl}</div>
       <div><span class="k">Packets</span>${(t.packets || 0).toLocaleString()}</div></div>
       ${t.error ? `<div class="err-line">${esc(t.error)}</div>` : ""}
+      ${t.conflict ? `<div class="err-line">Address also used on the network by ${esc(t.conflict)}</div>` : ""}
       ${t.running && S.ptp && S.ptp.lock !== "locked" ? `<div class="warn-line">PTP not locked</div>` : ""}</div></div>`;
   }
   return h + `</div>`;
 }
 function nextTxAddress() {
-  const used = new Set(S.tx.map(t => t.address));
-  for (let i = 1; i < 255; i++) { const a = `239.69.0.${i}`; if (!used.has(a)) return a; }
-  return "239.69.1.1";
+  return S.tx_next_address || "auto";
 }
 function chSelect(v) {
   return `<select name="channels">${[1, 2, 4, 6, 8].map(n => `<option value="${n}" ${n == v ? "selected" : ""}>${n}ch</option>`).join("")}</select>`;
 }
 function delaySelect(v) {
-  return `<select id="rxDelay">${[4, 5, 6, 7, 8, 9, 10].map(n => `<option value="${n}" ${n == v ? "selected" : ""}>${n} ms</option>`).join("")}</select>`;
+  return `<select id="rxDelay">${[4, 6, 8, 10].map(n => `<option value="${n}" ${n == v ? "selected" : ""}>${n} ms</option>`).join("")}</select>`;
 }
 function openTxForm(t) {
   const isNew = !t;
@@ -440,7 +439,8 @@ function openTxForm(t) {
     <div class="spacer"></div><button class="icon-btn" data-act="close">${icon("close")}</button></div>
     <form class="card-body" id="txForm">
     <div class="form-row"><label>Name</label><input type="text" name="name" value="${esc(t.name)}" required></div>
-    <div class="form-row"><label>Multicast address</label><input type="text" name="address" value="${esc(t.address)}" placeholder="239.69.0.1" required></div>
+    <div class="form-row"><label>Multicast address</label><div style="display:flex;gap:8px;flex:1"><input type="text" name="address" value="${esc(t.address)}" placeholder="auto" style="flex:1">
+      <button type="button" class="btn ghost" data-act="tx-auto-addr">Auto</button></div></div>
     <div class="form-row"><label>RTP port</label><input type="number" name="port" value="${t.port}" min="1" max="65535"></div>
     <div class="form-row"><label>Channels</label>${chSelect(t.channels)}</div>
     <div class="form-row"><label>Payload Type</label><input type="number" name="pt" value="${t.pt}" min="96" max="127"></div>
@@ -606,6 +606,7 @@ document.body.addEventListener("click", async e => {
       for (const p of S.ports.dst) collapsed[gkey("d", p.id)] = false;
       store.set("collapsed", JSON.stringify(collapsed)); render(true); break;
     case "tx-add": openTxForm(null); break;
+    case "tx-auto-addr": document.querySelector('#txForm [name=address]').value = nextTxAddress(); break;
     case "tx-edit": openTxForm(S.tx.find(x => x.id === id)); break;
     case "tx-sdp": {
       const tx = S.tx.find(x => x.id === id);
@@ -698,6 +699,7 @@ if (!host) {
       input: { running: true, channels: 2, rate: 48000, name: "Speakers (Realtek)", error: "" },
       output: { running: true, channels: 2, rate: 44100, name: "Speakers (Realtek)", error: "" } },
     rx_delay_ms: 4,
+    tx_next_address: "239.69.42.1",
     asio: { registered: true, preferred: 256 },
     ports: { src: [{ id: "wasapi", group: "wasapi", name: "WASAPI In", channels: 2, active: true },
                    { id: "asio", group: "asio", name: "ASIO Out (from DAW)", channels: 32, active: true },
