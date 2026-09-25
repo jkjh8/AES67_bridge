@@ -686,13 +686,13 @@ function mockHandle(m) {
   }, 30);
 }
 if (!host) {
-  S = { type: "state", node: { name: "AES67-Bridge", ip: "192.168.10.123" },
-    ptp: { lock: "locked", gmid: "2C-CF-67-FF-FE-EB-E3-ED", domain: 0 },
+  S = { type: "state", node: { name: "AES67-Bridge", ip: "192.168.1.20" },
+    ptp: { lock: "locked", gmid: "00-1D-C1-FF-FE-00-00-01", domain: 0 },
     tx: [{ id: 1, enabled: true, name: "AES67-Bridge TX", channels: 2, address: "239.69.0.1", port: 5004, pt: 98, ttl: 15, running: true, packets: 123456, sdp: "v=0\r\n..." },
          { id: 2, enabled: true, name: "DAW Bus 1-8", channels: 8, address: "239.69.0.2", port: 5004, pt: 98, ttl: 15, running: true, packets: 99 }],
-    rx: [{ id: 1, enabled: true, name: "AOIP 1-8", channels: 8, address: "239.69.0.18", port: 5004, pt: 98, running: true, receiving: true, packets: 5000 },
-         { id: 2, enabled: true, name: "OMNI512p-ACADE2-A : 128", channels: 2, address: "239.69.52.17", port: 5004, pt: 97, running: true, receiving: false, packets: 0 }],
-    sap: [{ name: "AOIP 1-8", address: "239.69.0.18", port: 5004, channels: 8, pt: 98, local: false },
+    rx: [{ id: 1, enabled: true, name: "Console 1-8", channels: 8, address: "239.69.0.18", port: 5004, pt: 98, running: true, receiving: true, packets: 5000 },
+         { id: 2, enabled: true, name: "Stage Box 1-2", channels: 2, address: "239.69.52.17", port: 5004, pt: 97, running: true, receiving: false, packets: 0 }],
+    sap: [{ name: "Console 1-8", address: "239.69.0.18", port: 5004, channels: 8, pt: 98, local: false },
           { name: "AES67-TX-1", address: "239.69.7.12", port: 5004, channels: 8, pt: 96, local: false },
           { name: "AES67-Bridge TX", address: "239.69.0.1", port: 5004, channels: 2, pt: 98, local: true }],
     audio: { input_enabled: true, input_device: "", input_loopback: true, output_enabled: true, output_device: "",
@@ -703,8 +703,8 @@ if (!host) {
     asio: { registered: true, preferred: 256 },
     ports: { src: [{ id: "wasapi", group: "wasapi", name: "WASAPI In", channels: 2, active: true },
                    { id: "asio", group: "asio", name: "ASIO Out (from DAW)", channels: 32, active: true },
-                   { id: "rx1", group: "aes", name: "AOIP 1-8", channels: 8, active: true },
-                   { id: "rx2", group: "aes", name: "OMNI512p-ACADE2-A : 128", channels: 2, active: true }],
+                   { id: "rx1", group: "aes", name: "Console 1-8", channels: 8, active: true },
+                   { id: "rx2", group: "aes", name: "Stage Box 1-2", channels: 2, active: true }],
              dst: [{ id: "tx1", group: "aes", name: "AES67-Bridge TX", channels: 2, active: true },
                    { id: "tx2", group: "aes", name: "DAW Bus 1-8", channels: 8, active: true },
                    { id: "wasapi", group: "wasapi", name: "WASAPI Out", channels: 2, active: true },
@@ -713,9 +713,9 @@ if (!host) {
              { src: "rx1", sc: 0, dst: "wasapi", dc: 0 }, { src: "rx1", sc: 1, dst: "wasapi", dc: 1 },
              { src: "asio", sc: 0, dst: "tx2", dc: 0 }, { src: "asio", sc: 1, dst: "tx2", dc: 1 },
              { src: "rx1", sc: 2, dst: "asio", dc: 0 }] };
-  S.network = { interface_id: "", auto: true, name: "Ethernet", ip: "192.168.10.123", mac: "C8:A3:62:12:34:56", speed: 1e9, clock_id: "C8-A3-62-FF-FE-12-34-56" };
-  DEV = { nics: [{ id: "{A}", name: "Ethernet", ip: "192.168.10.123", mac: "C8:A3:62:12:34:56", speed: 1e9, wireless: false },
-                 { id: "{B}", name: "Wi-Fi", ip: "10.0.0.5", mac: "AA:BB:CC:00:11:22", speed: 866700000, wireless: true }],
+  S.network = { interface_id: "", auto: true, name: "Ethernet", ip: "192.168.1.20", mac: "C8:A3:62:12:34:56", speed: 1e9, clock_id: "C8-A3-62-FF-FE-12-34-56" };
+  DEV = { nics: [{ id: "{A}", name: "Ethernet", ip: "192.168.1.20", mac: "C8:A3:62:12:34:56", speed: 1e9, wireless: false },
+                 { id: "{B}", name: "Wi-Fi", ip: "192.168.2.20", mac: "AA:BB:CC:00:11:22", speed: 866700000, wireless: true }],
           render: [{ id: "r1", name: "Speakers (Realtek)", default: true, channels: 2, rate: 48000 }],
           capture: [{ id: "c1", name: "Microphone (USB)", default: true, channels: 1, rate: 48000 }] };
 }
