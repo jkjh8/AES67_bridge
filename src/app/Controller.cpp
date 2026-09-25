@@ -92,7 +92,7 @@ json TxToJson(const TxConfig& t) {
 json RxToJson(const RxConfig& r) {
   return {{"id", r.id},           {"enabled", r.enabled},   {"name", r.name},
           {"channels", r.channels}, {"address", r.address}, {"port", r.rtp_port},
-          {"pt", r.payload_type}, {"delay_ms", r.delay_ms}};
+          {"pt", r.payload_type}};
 }
 
 std::string Dump(const json& j) {
@@ -124,6 +124,7 @@ bool Controller::Start() {
 
   engine_->ApplyAudio(cfg_.audio);
   for (const auto& t : cfg_.tx) engine_->ApplyTx(t, nullptr);
+  engine_->SetRxDelay(cfg_.rx_delay_ms);
   for (const auto& r : cfg_.rx) engine_->ApplyRx(r, nullptr);
   engine_->SetRoutes(cfg_.routes);
 
@@ -297,7 +298,6 @@ std::string Controller::HandleCommand(const std::string& text, bool* send_device
       r.rtp_port = s.value("port", r.rtp_port);
       r.channels = s.value("channels", r.channels);
       r.payload_type = s.value("pt", r.payload_type);
-      r.delay_ms = s.value("delay_ms", r.delay_ms);
       r.enabled = s.value("enabled", r.enabled);
       if (auto e = ValidateRx(r); !e.empty()) throw std::runtime_error(e);
       for (const auto& o : cfg_.rx)
@@ -390,6 +390,16 @@ std::string Controller::HandleCommand(const std::string& text, bool* send_device
       Stop();
       Start();
 
+    } else if (cmd == "rx_delay_save") {
+      const int d = m.value("delay_ms", cfg_.rx_delay_ms);
+      if (d < kMinRxDelayMs || d > kMaxRxDelayMs) throw std::runtime_error("delay must be 4..10 ms");
+      cfg_.rx_delay_ms = d;
+      engine_->SetRxDelay(d);
+      for (const auto& r : cfg_.rx) engine_->ApplyRx(r, nullptr);
+      engine_->SetRoutes(cfg_.routes);
+      LOGI("ui: RX delay -> %d ms", d);
+      Persist();
+
     } else if (cmd == "asio_save") {
       const int b = m.value("preferred_buffer", cfg_.asio.preferred_buffer);
       cfg_.asio.preferred_buffer = (int)aes67asio::NormalizeBuffer((uint32_t)std::max(b, 1));
@@ -480,6 +490,7 @@ std::string Controller::StateJson() const {
                 {"input", dev(st.in)},
                 {"output", dev(st.out)}};
 
+  j["rx_delay_ms"] = cfg_.rx_delay_ms;
   j["asio"] = {{"registered", AsioRegistered()},
                {"preferred", cfg_.asio.preferred_buffer}};
 

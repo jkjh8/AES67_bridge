@@ -3,6 +3,7 @@
 #include <winsock2.h>
 #include <windows.h>
 
+#include <algorithm>
 #include <cstdlib>
 #include <fstream>
 #include <sstream>
@@ -59,7 +60,6 @@ RxConfig RxFrom(const json& j) {
   c.address = j.value("address", c.address);
   c.rtp_port = j.value("rtp_port", c.rtp_port);
   c.payload_type = j.value("payload_type", c.payload_type);
-  c.delay_ms = j.value("delay_ms", c.delay_ms);
   return c;
 }
 AudioDeviceConfig AudioFrom(const json& j) {
@@ -89,8 +89,7 @@ json RxJson(const RxConfig& r) {
   return json{{"id", r.id},           {"enabled", r.enabled},
               {"name", r.name},       {"channels", r.channels},
               {"address", r.address}, {"rtp_port", r.rtp_port},
-              {"payload_type", r.payload_type},
-              {"delay_ms", r.delay_ms}};
+              {"payload_type", r.payload_type}};
 }
 
 json ToJson(const AppConfig& c) {
@@ -118,6 +117,7 @@ json ToJson(const AppConfig& c) {
       {"asio", {{"preferred_buffer", c.asio.preferred_buffer}}},
       {"routes", routes},
       {"sap", {{"enabled", c.sap.enabled}, {"interval_s", c.sap.interval_s}}},
+      {"rx_delay_ms", c.rx_delay_ms},
       {"autostart", c.autostart},
       {"log_severity", c.log_severity},
   };
@@ -130,6 +130,7 @@ AppConfig FromJson(const json& j) {
   if (j.contains("network")) c.network = NetworkFrom(j["network"]);
   if (j.contains("ptp")) c.ptp = PtpFrom(j["ptp"]);
   if (j.contains("sap")) c.sap = SapFrom(j["sap"]);
+  c.rx_delay_ms = std::clamp(j.value("rx_delay_ms", c.rx_delay_ms), kMinRxDelayMs, kMaxRxDelayMs);
   if (j.contains("audio")) c.audio = AudioFrom(j["audio"]);
   if (j.contains("asio"))
     c.asio.preferred_buffer = j["asio"].value("preferred_buffer", c.asio.preferred_buffer);
@@ -242,7 +243,6 @@ std::string ValidateRx(const RxConfig& r) {
   if (r.address.empty() || a == ntohl(INADDR_NONE) || (a >> 28) != 0xE)
     return "address must be an IPv4 multicast group";
   if (r.rtp_port <= 0 || r.rtp_port > 65535) return "invalid RTP port";
-  if (r.delay_ms < 1 || r.delay_ms > 500) return "delay must be 1..500 ms";
   return "";
 }
 

@@ -5,6 +5,7 @@
 #include <mswsock.h>
 #include <windows.h>
 
+#include <algorithm>
 #include <atomic>
 #include <thread>
 #include <vector>
@@ -132,7 +133,7 @@ void RxStream::Impl::RecvLoop() {
 RxStream::RxStream() : impl_(std::make_unique<Impl>()) {}
 RxStream::~RxStream() { Stop(); }
 
-bool RxStream::Start(const RxConfig& cfg, uint32_t ifaceIpHost, PtpClient* ptp,
+bool RxStream::Start(const RxConfig& cfg, int delay_ms, uint32_t ifaceIpHost, PtpClient* ptp,
                      std::string* err) {
   WSADATA wsa;
   WSAStartup(MAKEWORD(2, 2), &wsa);
@@ -142,7 +143,7 @@ bool RxStream::Start(const RxConfig& cfg, uint32_t ifaceIpHost, PtpClient* ptp,
   im->cfg = cfg;
   im->ptp = ptp;
   im->src_ch = (cfg.channels >= 1 && cfg.channels <= 64) ? cfg.channels : 2;
-  im->link_off = (uint32_t)(cfg.delay_ms > 0 ? cfg.delay_ms : 4) * 48;
+  im->link_off = (uint32_t)std::clamp(delay_ms, kMinRxDelayMs, kMaxRxDelayMs) * 48;
   im->group_be = inet_addr(cfg.address.c_str());
   im->got_audio = false;
   im->packets = 0;
@@ -185,7 +186,7 @@ bool RxStream::Start(const RxConfig& cfg, uint32_t ifaceIpHost, PtpClient* ptp,
   im->thread = std::thread([im] { im->RecvLoop(); });
   LOGI("rx: started '%s' %s:%d PT%d %uch delay=%dms (PTP-aligned)",
        cfg.name.c_str(), cfg.address.c_str(), cfg.rtp_port, cfg.payload_type,
-       im->src_ch, cfg.delay_ms);
+       im->src_ch, delay_ms);
   return true;
 }
 

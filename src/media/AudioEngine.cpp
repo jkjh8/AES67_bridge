@@ -99,6 +99,7 @@ struct AudioEngine::Impl {
   uint8_t domain = 0;
   SapConfig sap_cfg;
   uint32_t local_ip = 0;
+  int rx_delay_ms = kMinRxDelayMs;
 
   mutable std::mutex mtx;
   std::map<int, TxEntry> tx;
@@ -387,6 +388,8 @@ void AudioEngine::RemoveTx(int id) {
   if (old.stream) old.stream->Stop();
 }
 
+void AudioEngine::SetRxDelay(int ms) { impl_->rx_delay_ms = ms; }
+
 bool AudioEngine::ApplyRx(const RxConfig& cfg, std::string* err) {
   Impl* im = impl_.get();
   RemoveRx(cfg.id);
@@ -396,7 +399,7 @@ bool AudioEngine::ApplyRx(const RxConfig& cfg, std::string* err) {
   if (cfg.enabled) {
     e.stream = std::make_unique<RxStream>();
     std::string serr;
-    if (!e.stream->Start(cfg, im->local_ip, im->ptp, &serr)) {
+    if (!e.stream->Start(cfg, im->rx_delay_ms, im->local_ip, im->ptp, &serr)) {
       e.err = serr;
       e.stream.reset();
       ok = false;

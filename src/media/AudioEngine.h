@@ -28,6 +28,7 @@ class AudioEngine {
 
   bool ApplyTx(const TxConfig& cfg, std::string* err);
   void RemoveTx(int id);
+  void SetRxDelay(int ms);
   bool ApplyRx(const RxConfig& cfg, std::string* err);
   void RemoveRx(int id);
   void SetRoutes(const std::vector<Route>& routes);

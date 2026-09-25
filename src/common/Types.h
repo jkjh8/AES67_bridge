@@ -40,6 +40,9 @@ struct TxConfig {
   int dscp = 34;
 };
 
+inline constexpr int kMinRxDelayMs = 4;
+inline constexpr int kMaxRxDelayMs = 10;
+
 struct RxConfig {
   int id = 0;
   bool enabled = true;
@@ -48,7 +51,6 @@ struct RxConfig {
   std::string address = "239.69.0.18";
   int rtp_port = 5004;
   int payload_type = 98;
-  int delay_ms = 4;
 };
 
 struct AudioDeviceConfig {
@@ -87,6 +89,7 @@ struct AppConfig {
   AsioConfig asio;
   std::vector<Route> routes;
   SapConfig sap;
+  int rx_delay_ms = kMinRxDelayMs;
   bool autostart = false;
   std::string log_severity = "info";
 };

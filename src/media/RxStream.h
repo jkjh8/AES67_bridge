@@ -18,7 +18,7 @@ class RxStream {
   RxStream(const RxStream&) = delete;
   RxStream& operator=(const RxStream&) = delete;
 
-  bool Start(const RxConfig& cfg, uint32_t ifaceIpHost, PtpClient* ptp,
+  bool Start(const RxConfig& cfg, int delay_ms, uint32_t ifaceIpHost, PtpClient* ptp,
              std::string* err);
   void Stop();
   bool running() const;
