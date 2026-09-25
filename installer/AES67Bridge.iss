@@ -26,6 +26,7 @@ UninstallDisplayIcon={app}\{#AppExe}
 Compression=lzma2/max
 SolidCompression=yes
 WizardStyle=modern
+LicenseFile=..\LICENSE
 CloseApplications=yes
 RestartApplications=no
 
@@ -40,7 +41,7 @@ Name: "autostart"; Description: "Start AES67 Bridge when Windows starts"; GroupD
 [Files]
 Source: "{#BinDir}\{#AppExe}"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#BinDir}\{#AsioDll}"; DestDir: "{app}"; Flags: ignoreversion regserver restartreplace uninsrestartdelete
-Source: "..\asio_driver\LICENSE"; DestDir: "{app}"; DestName: "LICENSE-ASIO-DRIVER.txt"; Flags: ignoreversion
+Source: "..\LICENSE"; DestDir: "{app}"; DestName: "LICENSE.txt"; Flags: ignoreversion
 Source: "..\THIRD_PARTY_NOTICES.txt"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]

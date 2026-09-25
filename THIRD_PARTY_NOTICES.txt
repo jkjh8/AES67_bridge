@@ -1,12 +1,14 @@
 AES67 Bridge - third-party notices
 ==================================
 
-AES67BridgeASIO.dll (virtual ASIO driver)
------------------------------------------
-Built with the Steinberg ASIO SDK 2.3 under its GNU General Public License
-version 3 option. The driver (asio_driver/) is licensed under the GNU GPL v3;
-see LICENSE-ASIO-DRIVER.txt. ASIO is a trademark of Steinberg Media
-Technologies GmbH.
+AES67 Bridge is licensed under the GNU General Public License version 3;
+see LICENSE.txt.
+
+Steinberg ASIO SDK
+------------------
+AES67BridgeASIO.dll is built with the Steinberg ASIO SDK 2.3 under its GNU
+General Public License version 3 option. ASIO is a trademark of Steinberg
+Media Technologies GmbH.
 
 libsamplerate (https://github.com/libsndfile/libsamplerate)
 -----------------------------------------------------------
