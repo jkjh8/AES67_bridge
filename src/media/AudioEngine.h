@@ -39,6 +39,7 @@ class AudioEngine {
     int id = 0;
     bool running = false;
     uint64_t packets = 0;
+    uint64_t send_errors = 0;
     std::string error;
     std::string sdp;
   };
@@ -68,7 +69,7 @@ class AudioEngine {
     DevStatus in, out;
     AsioLink::Status asio;
     uint32_t local_ip = 0;
-    uint64_t tics = 0, tic_burst2 = 0, tic_burst3 = 0;
+    uint64_t tics = 0, tic_burst2 = 0, tic_burst3 = 0, max_lag = 0;
   };
   Status GetStatus(bool with_diag = false) const;
 

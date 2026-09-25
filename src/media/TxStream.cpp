@@ -60,6 +60,8 @@ struct TxStream::Impl {
 
   std::atomic<bool> running{false};
   std::atomic<uint64_t> packets{0};
+  std::atomic<uint64_t> send_errors{0};
+  int last_error = 0;
   std::mutex send_mutex;
 };
 
@@ -154,12 +156,21 @@ void TxStream::SendBlock(uint64_t block_sac, const float* planar) {
   for (uint32_t i = 0; i < kFrameSize; ++i)
     for (int c = 0; c < nch; ++c, d += 3) PutL24(d, planar[(size_t)c * kFrameSize + i]);
   if (sendto(im->sock, (const char*)h, (int)im->pkt.size(), 0, (sockaddr*)&im->dst,
-             sizeof(im->dst)) > 0)
+             sizeof(im->dst)) > 0) {
     im->packets.fetch_add(1, std::memory_order_relaxed);
+  } else {
+    im->send_errors.fetch_add(1, std::memory_order_relaxed);
+    const int e = WSAGetLastError();
+    if (e != im->last_error) {
+      im->last_error = e;
+      LOGW("tx: sendto failed on %s (%d)", im->cfg.address.c_str(), e);
+    }
+  }
 }
 
 int TxStream::channels() const { return impl_->channels; }
 uint64_t TxStream::packets() const { return impl_->packets.load(); }
+uint64_t TxStream::send_errors() const { return impl_->send_errors.load(); }
 bool TxStream::running() const { return impl_->running.load(); }
 uint32_t TxStream::LocalIpHost() const { return impl_->iface_ip_host; }
 

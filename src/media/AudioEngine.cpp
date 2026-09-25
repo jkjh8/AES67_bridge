@@ -47,6 +47,22 @@ int PortId(const std::string& port, const char* prefix) {
   return atoi(port.c_str() + n);
 }
 
+constexpr int kMinPacketGapUs = 300;
+
+void PaceAfter(const LARGE_INTEGER& since, int min_us) {
+  static const int64_t freq = [] {
+    LARGE_INTEGER f;
+    QueryPerformanceFrequency(&f);
+    return (int64_t)f.QuadPart;
+  }();
+  const int64_t need = freq * min_us / 1000000;
+  LARGE_INTEGER now;
+  do {
+    YieldProcessor();
+    QueryPerformanceCounter(&now);
+  } while (now.QuadPart - since.QuadPart < need);
+}
+
 constexpr double kInTargetMs = 15.0;
 constexpr double kOutTargetMs = 20.0;
 }
@@ -113,7 +129,8 @@ struct AudioEngine::Impl {
 
   uint64_t eng_sac = 0;
   bool eng_init = false;
-  mutable std::atomic<uint64_t> tic_count{0}, tic_burst2{0}, tic_burst3{0};
+  LARGE_INTEGER last_block_qpc{};
+  mutable std::atomic<uint64_t> tic_count{0}, tic_burst2{0}, tic_burst3{0}, max_lag{0};
 
   void RebuildLocked();
   void ProcessBlock(Plan& p, uint64_t b);
@@ -288,8 +305,16 @@ void AudioEngine::OnTic() {
 
   const uint64_t ptp_sac = im->ptp->GlobalSac();
   if (!im->eng_init || ptp_sac < im->eng_sac || ptp_sac - im->eng_sac > 4800) {
+    if (im->eng_init)
+      LOGW("engine: realign (clock %s by %lld samples)", ptp_sac < im->eng_sac ? "back" : "ahead",
+           (long long)(ptp_sac < im->eng_sac ? im->eng_sac - ptp_sac : ptp_sac - im->eng_sac));
     im->eng_sac = ptp_sac - (ptp_sac % kBlock);
     im->eng_init = true;
+  }
+  {
+    const uint64_t lag = ptp_sac - im->eng_sac;
+    uint64_t prev = im->max_lag.load(std::memory_order_relaxed);
+    if (lag > prev) im->max_lag.store(lag, std::memory_order_relaxed);
   }
 
   if (p->in_ch) {
@@ -303,7 +328,9 @@ void AudioEngine::OnTic() {
 
   int guard = 0;
   while (im->eng_sac + kBlock <= ptp_sac && guard < 8) {
+    PaceAfter(im->last_block_qpc, kMinPacketGapUs);
     if (p->asio) im->asio.WaitForOutput(im->eng_sac, 500);
+    QueryPerformanceCounter(&im->last_block_qpc);
     im->ProcessBlock(*p, im->eng_sac);
     im->eng_sac += kBlock;
     ++guard;
@@ -497,6 +524,7 @@ AudioEngine::Status AudioEngine::GetStatus(bool with_diag) const {
     st.tics = im->tic_count.exchange(0);
     st.tic_burst2 = im->tic_burst2.exchange(0);
     st.tic_burst3 = im->tic_burst3.exchange(0);
+    st.max_lag = im->max_lag.exchange(0);
   }
   if (st.in.running) {
     st.in.asrc_ppm = im->in_ppm.load();
@@ -514,6 +542,7 @@ AudioEngine::Status AudioEngine::GetStatus(bool with_diag) const {
     if (e.stream) {
       t.running = e.stream->running();
       t.packets = e.stream->packets();
+      t.send_errors = e.stream->send_errors();
       t.sdp = e.stream->Sdp();
     }
     st.tx.push_back(std::move(t));

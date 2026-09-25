@@ -25,6 +25,7 @@ class TxStream {
 
   int channels() const;
   uint64_t packets() const;
+  uint64_t send_errors() const;
 
   bool running() const;
   std::string Sdp() const;

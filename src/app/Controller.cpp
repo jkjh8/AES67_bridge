@@ -158,8 +158,9 @@ void Controller::Tick() {
   if (engine_ && ++tick_count_ % 10 == 0) {
     const auto st = engine_->GetStatus(true);
     LOGI("stat: ptp %s", ptp_->Diag().c_str());
-    LOGI("stat: tic n=%llu burst>=2:%llu burst>=3:%llu", (unsigned long long)st.tics,
-         (unsigned long long)st.tic_burst2, (unsigned long long)st.tic_burst3);
+    LOGI("stat: tic n=%llu burst>=2:%llu burst>=3:%llu max-lag=%.2fms", (unsigned long long)st.tics,
+         (unsigned long long)st.tic_burst2, (unsigned long long)st.tic_burst3,
+         st.max_lag / 48.0);
     if (st.in.running)
       LOGI("stat: wasapi-in asrc=%+.1f ppm fifo=%.1f ms rate=%d underruns=%llu",
            st.in.asrc_ppm, st.in.fifo_ms, st.in.rate, (unsigned long long)st.in.underruns);
@@ -167,8 +168,8 @@ void Controller::Tick() {
       LOGI("stat: wasapi-out asrc=%+.1f ppm fifo=%.1f ms rate=%d", st.out.asrc_ppm,
            st.out.fifo_ms, st.out.rate);
     for (const auto& t : st.tx)
-      LOGI("stat: tx#%d running=%d pkts=%llu", t.id, t.running,
-           (unsigned long long)t.packets);
+      LOGI("stat: tx#%d running=%d pkts=%llu send-errors=%llu", t.id, t.running,
+           (unsigned long long)t.packets, (unsigned long long)t.send_errors);
     for (const auto& r : st.rx)
       LOGI("stat: rx#%d running=%d receiving=%d pkts=%llu other-group=%llu pt-mismatch=%llu %s",
            r.id, r.running, r.receiving, (unsigned long long)r.packets,
