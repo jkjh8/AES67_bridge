@@ -86,8 +86,35 @@ The configuration is stored in `%ProgramData%\AES67Bridge\config.json`. The log 
 ## Network recommendations
 
 - Use a built-in (PCIe) wired Ethernet adapter. USB Ethernet adapters can hold packets back for several milliseconds at a time. Receivers with short playout delays then report late packets.
-- Disable Energy-Efficient Ethernet and flow control on the adapter.
+- If you must use a USB adapter, plug it directly into the computer. A dock or hub, especially over Thunderbolt, adds further delay.
 - Wi-Fi is not suitable for AES67.
+
+### Adapter settings
+
+Open Device Manager → Network adapters → your adapter → Properties → Advanced, and set:
+
+| Property | Setting | Why |
+|---|---|---|
+| Energy-Efficient Ethernet / Green Ethernet | Disabled | Link power saving delays packets |
+| Flow Control | Disabled | Pause frames from the switch can stop transmission for milliseconds |
+| Transmit URBs (USB adapters) | 16 or more | More USB transfers in flight, so packets queue less |
+| Receive URBs (USB adapters) | 16 or more | Same for incoming packets |
+| Interrupt Moderation (PCIe adapters) | Disabled or Low | Lower delay for small, frequent packets |
+
+For USB adapters, also turn off USB selective suspend: Control Panel → Power Options → Change plan settings → Change advanced power settings → USB settings → USB selective suspend setting → Disabled.
+
+The same settings from an elevated PowerShell, with the adapter named `Ethernet` (property names depend on the driver; list them with `Get-NetAdapterAdvancedProperty -Name Ethernet`):
+
+```
+Set-NetAdapterAdvancedProperty -Name Ethernet -RegistryKeyword "*FlowControl" -DisplayValue "Disabled"
+Set-NetAdapterAdvancedProperty -Name Ethernet -RegistryKeyword "PendingTransmits" -DisplayValue "16"
+Set-NetAdapterAdvancedProperty -Name Ethernet -RegistryKeyword "PendingReceives" -DisplayValue "16"
+```
+
+Changing adapter properties restarts the adapter. Restart AES67 Bridge afterwards.
+
+### Switches and firewall
+
 - Enable IGMP snooping with a querier on the switches. Give DSCP 46 (PTP) and 34 (audio) priority, as in the usual AES67/Dante QoS setup.
 - The firewall must allow UDP 319/320 (PTP), 9875 (SAP) and the RTP ports. The installer adds a rule for the application.
 
