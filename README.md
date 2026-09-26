@@ -17,11 +17,11 @@ AES67 Bridge is a Windows tray application. It connects Windows audio (WASAPI) a
 - A wired Ethernet interface on the AES67 network
 - A PTP grandmaster on the same network and domain, such as a Dante/AES67 device or a dedicated grandmaster
 
-## Installation
+## Getting started
 
-1. Download `AES67Bridge-Setup-<version>.exe` from the [Releases](../../releases) page and run it.
-2. The installer registers the ASIO driver. It also adds a Windows Firewall rule for the application.
-3. You can choose to start AES67 Bridge with Windows.
+1. Build the application (see [Building from source](#building-from-source)) and run `build\src\Release\AES67Bridge.exe`.
+2. Allow AES67 Bridge through Windows Firewall when asked, for private and public networks as needed.
+3. To use the ASIO driver, open **Devices → ASIO** and press **Register (admin)**.
 
 AES67 Bridge runs in the system tray. Double-click the tray icon, or choose **Open AES67 Bridge**, to open the window. **Exit** stops all streams and closes the application.
 
@@ -116,7 +116,7 @@ Changing adapter properties restarts the adapter. Restart AES67 Bridge afterward
 ### Switches and firewall
 
 - Enable IGMP snooping with a querier on the switches. Give DSCP 46 (PTP) and 34 (audio) priority, as in the usual AES67/Dante QoS setup.
-- The firewall must allow UDP 319/320 (PTP), 9875 (SAP) and the RTP ports. The installer adds a rule for the application.
+- The firewall must allow UDP 319/320 (PTP), 9875 (SAP) and the RTP ports.
 
 ## Troubleshooting
 
@@ -130,17 +130,11 @@ Changing adapter properties restarts the adapter. Restart AES67 Bridge afterward
 
 ## Building from source
 
-Requirements: Visual Studio 2022 with the C++ workload, CMake 3.21 or later, and [Inno Setup 6](https://jrsoftware.org/isinfo.php) for the installer. Dependencies (libsamplerate, nlohmann/json, the WebView2 SDK and the ASIO SDK) are downloaded during the CMake configure step.
+Requirements: Visual Studio 2022 with the C++ workload and CMake 3.21 or later. Dependencies (libsamplerate, nlohmann/json, the WebView2 SDK and the ASIO SDK) are downloaded during the CMake configure step.
 
 ```
 cmake -S . -B build -G "Visual Studio 17 2022" -A x64
 cmake --build build --config Release
-```
-
-To build the installer (output in `dist\`):
-
-```
-powershell -ExecutionPolicy Bypass -File scripts\build-installer.ps1
 ```
 
 ## License
