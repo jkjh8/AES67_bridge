@@ -153,6 +153,6 @@ Changing adapter properties restarts the adapter. Restart AES67 Bridge afterward
 
 ## License
 
-AES67 Bridge is free software, licensed under the [GNU General Public License v3.0](LICENSE).
+AES67 Bridge is free software, licensed under the [GNU General Public License v3.0](LICENSE). It is provided **as is, with no warranty of any kind**; use it at your own risk, as stated in the license.
 
 The virtual ASIO driver is built with the Steinberg ASIO SDK under its GPLv3 license option. The SDK itself is not part of this repository; download it from [Steinberg](https://www.steinberg.net/developers/asiosdk-open/). ASIO is a trademark of Steinberg Media Technologies GmbH. See [THIRD_PARTY_NOTICES.txt](THIRD_PARTY_NOTICES.txt) for the licenses of the bundled components.
