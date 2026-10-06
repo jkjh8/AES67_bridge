@@ -22,6 +22,7 @@ class Controller {
   void Stop();
 
   void Tick();
+  bool RefreshNetwork();
 
   std::string HandleCommand(const std::string& json, bool* send_devices);
 

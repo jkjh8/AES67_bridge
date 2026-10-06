@@ -32,11 +32,14 @@ class TrayApp {
   void UpdateTooltip();
   void OpenUi();
   void OnUiMessage(const std::string& json);
+  void OnNetworkChanged();
 
   HINSTANCE hinst_ = nullptr;
   HWND hwnd_ = nullptr;
   NOTIFYICONDATAW nid_{};
   bool nid_added_ = false;
+  HANDLE if_notify_ = nullptr;
+  HANDLE addr_notify_ = nullptr;
 
   std::unique_ptr<Controller> ctl_;
   std::unique_ptr<WebUi> ui_;

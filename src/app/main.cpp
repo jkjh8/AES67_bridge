@@ -33,15 +33,8 @@ int WINAPI wWinMain(HINSTANCE hinst, HINSTANCE, PWSTR cmdline, int) {
   if (const std::string err = ValidateConfig(cfg); !err.empty()) {
     LOGW("config invalid (%s); continuing with values as-is", err.c_str());
   }
-  if (used_defaults) {
-    TxConfig tx;
-    tx.id = 1;
-    cfg.tx.push_back(tx);
-    cfg.routes.push_back({"wasapi", 0, "tx1", 0});
-    cfg.routes.push_back({"wasapi", 1, "tx1", 1});
-    if (SaveConfig(config_path, cfg))
-      LOGI("seeded default config at %ls", config_path.c_str());
-  }
+  if (used_defaults && SaveConfig(config_path, cfg))
+    LOGI("created default config at %ls", config_path.c_str());
 
   TrayApp app(hinst, config_path, cfg);
   if (!app.Create()) {

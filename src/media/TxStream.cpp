@@ -10,6 +10,7 @@
 #include <cstring>
 #include <ctime>
 #include <mutex>
+#include <random>
 #include <thread>
 #include <vector>
 
@@ -174,7 +175,7 @@ bool TxStream::Start(PtpClient* ptp, const TxConfig& cfg, uint32_t ifaceIpHost,
   im->ptp_domain = ptpDomain;
   im->channels = (cfg.channels >= 1 && cfg.channels <= 8) ? cfg.channels : 2;
   im->packets = 0;
-  im->ssrc = 0x11223344u + (uint32_t)(cfg.id > 0 ? cfg.id - 1 : 0);
+  im->ssrc = std::random_device{}() ^ (ifaceIpHost * 2654435761u) ^ ((uint32_t)cfg.id << 24);
   LARGE_INTEGER qpc, qf;
   QueryPerformanceFrequency(&qf);
   im->qpc_freq = qf.QuadPart;

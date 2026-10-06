@@ -192,6 +192,17 @@ void Controller::Tick() {
   }
 }
 
+bool Controller::RefreshNetwork() {
+  bool is_auto = true;
+  const NetIf n = ResolveNetIf(cfg_.network.interface_id, cfg_.network.interface_ip, &is_auto);
+  if (n.id == net_.id && n.ip_host == net_.ip_host) return false;
+  LOGI("net: interface changed %s %s -> %s %s", net_.name.c_str(), net_.ip.c_str(),
+       n.name.c_str(), n.ip.c_str());
+  Stop();
+  Start();
+  return true;
+}
+
 void Controller::Persist() {
   if (!SaveConfig(config_path_, cfg_)) LOGE("controller: failed to persist config");
 }

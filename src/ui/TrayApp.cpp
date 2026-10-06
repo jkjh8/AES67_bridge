@@ -1,5 +1,8 @@
 #include "ui/TrayApp.h"
 
+#include <winsock2.h>
+#include <ws2ipdef.h>
+#include <iphlpapi.h>
 #include <shellapi.h>
 
 #include <string>
@@ -13,6 +16,16 @@ namespace {
 constexpr UINT kTrayCallback = WM_APP + 1;
 constexpr UINT kTrayIconId = 1;
 constexpr UINT_PTR kStatusTimerId = 1;
+constexpr UINT_PTR kNetTimerId = 2;
+constexpr UINT kMsgNetChanged = WM_APP + 3;
+
+void CALLBACK OnIfChange(PVOID ctx, PMIB_IPINTERFACE_ROW, MIB_NOTIFICATION_TYPE) {
+  PostMessageW(static_cast<HWND>(ctx), kMsgNetChanged, 0, 0);
+}
+
+void CALLBACK OnAddrChange(PVOID ctx, PMIB_UNICASTIPADDRESS_ROW, MIB_NOTIFICATION_TYPE) {
+  PostMessageW(static_cast<HWND>(ctx), kMsgNetChanged, 0, 0);
+}
 
 enum MenuId : UINT {
   kMenuOpen = 100,
@@ -78,6 +91,8 @@ bool TrayApp::Create() {
   ui_ = std::make_unique<WebUi>(hinst_, [this](const std::string& m) { OnUiMessage(m); });
 
   SetTimer(hwnd_, kStatusTimerId, 1000, nullptr);
+  NotifyIpInterfaceChange(AF_INET, &OnIfChange, hwnd_, FALSE, &if_notify_);
+  NotifyUnicastIpAddressChange(AF_INET, &OnAddrChange, hwnd_, FALSE, &addr_notify_);
   return true;
 }
 
@@ -137,8 +152,15 @@ LRESULT TrayApp::WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
       }
       return 0;
 
+    case kMsgNetChanged:
+      SetTimer(hwnd, kNetTimerId, 1500, nullptr);
+      return 0;
+
     case WM_TIMER:
-      if (wp == kStatusTimerId) {
+      if (wp == kNetTimerId) {
+        KillTimer(hwnd, kNetTimerId);
+        OnNetworkChanged();
+      } else if (wp == kStatusTimerId) {
         ctl_->Tick();
         UpdateTooltip();
         if (ui_ && ui_->visible()) ui_->Post(ctl_->StateJson());
@@ -146,6 +168,10 @@ LRESULT TrayApp::WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
       return 0;
 
     case WM_DESTROY:
+      if (if_notify_) CancelMibChangeNotify2(if_notify_);
+      if (addr_notify_) CancelMibChangeNotify2(addr_notify_);
+      if_notify_ = addr_notify_ = nullptr;
+      KillTimer(hwnd, kNetTimerId);
       KillTimer(hwnd, kStatusTimerId);
       ui_.reset();
       ctl_->Stop();
@@ -185,6 +211,13 @@ void TrayApp::OpenUi() {
   ui_->Show();
   ui_->Post(R"({"type":"show"})");
   ui_->Post(ctl_->StateJson());
+}
+
+void TrayApp::OnNetworkChanged() {
+  const bool restarted = ctl_->RefreshNetwork();
+  if (!ui_) return;
+  ui_->Post(ctl_->DevicesJson());
+  if (restarted) ui_->Post(ctl_->StateJson());
 }
 
 void TrayApp::OnUiMessage(const std::string& json) {
