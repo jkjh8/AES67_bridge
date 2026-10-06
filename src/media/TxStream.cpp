@@ -10,7 +10,6 @@
 #include <cstring>
 #include <ctime>
 #include <mutex>
-#include <random>
 #include <thread>
 #include <vector>
 
@@ -175,7 +174,7 @@ bool TxStream::Start(PtpClient* ptp, const TxConfig& cfg, uint32_t ifaceIpHost,
   im->ptp_domain = ptpDomain;
   im->channels = (cfg.channels >= 1 && cfg.channels <= 8) ? cfg.channels : 2;
   im->packets = 0;
-  im->ssrc = std::random_device{}() ^ (ifaceIpHost * 2654435761u) ^ ((uint32_t)cfg.id << 24);
+  im->ssrc = 0x11223344u ^ (ifaceIpHost * 2654435761u) ^ ((uint32_t)cfg.id << 24);
   LARGE_INTEGER qpc, qf;
   QueryPerformanceFrequency(&qf);
   im->qpc_freq = qf.QuadPart;
@@ -311,13 +310,12 @@ bool TxStream::running() const { return impl_->running.load(); }
 uint32_t TxStream::LocalIpHost() const { return impl_->iface_ip_host; }
 
 std::string TxStream::Sdp() const {
-  if (!impl_->running.load() || !impl_->ptp) return "";
-  const std::string gmid = impl_->ptp->GetInfo().gmid;
-  if (gmid.empty()) return "";
+  if (!impl_->running.load()) return "";
+  const std::string gmid = impl_->ptp ? impl_->ptp->GetInfo().gmid : "";
   uint64_t version;
   {
     std::lock_guard<std::mutex> lk(impl_->sdp_mtx);
-    if (gmid != impl_->sdp_gmid) {
+    if (!gmid.empty() && gmid != impl_->sdp_gmid) {
       impl_->sdp_gmid = gmid;
       impl_->sdp_version = std::max<uint64_t>(impl_->sdp_version + 1, (uint64_t)time(nullptr));
     }
@@ -350,7 +348,8 @@ std::string TxStream::Sdp() const {
       impl_->cfg.address.c_str(), impl_->cfg.rtp_port, impl_->cfg.payload_type,
       impl_->cfg.address.c_str(), impl_->cfg.payload_type, impl_->channels, domain);
   std::string sdp(buf, n > 0 ? (size_t)n : 0);
-  sdp += "a=ts-refclk:ptp=IEEE1588-2008:" + gmid + ":" + std::to_string(domain) + "\r\n";
+  if (!gmid.empty())
+    sdp += "a=ts-refclk:ptp=IEEE1588-2008:" + gmid + ":" + std::to_string(domain) + "\r\n";
   return sdp;
 }
 
