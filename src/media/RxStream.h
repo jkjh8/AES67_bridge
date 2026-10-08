@@ -30,6 +30,13 @@ class RxStream {
   bool receiving() const;
   uint64_t filtered() const;
   uint64_t pt_mismatch() const;
+  uint64_t lost() const;
+  uint64_t late() const;
+  uint64_t bad() const;
+  uint32_t ssrc() const;
+  uint64_t ssrc_changes() const;
+  uint64_t since_ms() const;
+  void ResetCounts();
   std::string DiagAndReset();
 
  private:

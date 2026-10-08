@@ -493,6 +493,13 @@ void AudioEngine::RemoveRx(int id) {
   if (old.stream) old.stream->Stop();
 }
 
+void AudioEngine::ResetRxCounts(int id) {
+  Impl* im = impl_.get();
+  std::lock_guard<std::mutex> lk(im->mtx);
+  auto it = im->rx.find(id);
+  if (it != im->rx.end() && it->second.stream) it->second.stream->ResetCounts();
+}
+
 void AudioEngine::SetRoutes(const std::vector<Route>& routes) {
   std::lock_guard<std::mutex> lk(impl_->mtx);
   impl_->routes = routes;
@@ -643,6 +650,12 @@ AudioEngine::Status AudioEngine::GetStatus(bool with_diag) const {
       r.packets = e.stream->packets();
       r.filtered = e.stream->filtered();
       r.pt_mismatch = e.stream->pt_mismatch();
+      r.lost = e.stream->lost();
+      r.late = e.stream->late();
+      r.bad = e.stream->bad();
+      r.ssrc = e.stream->ssrc();
+      r.ssrc_changes = e.stream->ssrc_changes();
+      r.since_ms = e.stream->since_ms();
       if (with_diag) r.diag = e.stream->DiagAndReset();
     }
     st.rx.push_back(std::move(r));

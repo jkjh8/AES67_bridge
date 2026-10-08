@@ -147,6 +147,12 @@ tr td.x.agg.has.c-aes { background: #b67fcc; }
 td.sep { width: 8px; } tr.sep td { height: 8px; }
 .legend { display: flex; gap: 18px; align-items: center; color: var(--muted); font-size: 13px; margin-bottom: 10px; flex-wrap: wrap; }
 
+.stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px 20px; }
+.stat-item { display: flex; flex-direction: column; gap: 2px; }
+.stat-k { font-size: 11px; font-weight: 700; color: var(--muted); letter-spacing: .4px; text-transform: uppercase; }
+.stat-v { font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.stat-v .sub { font-size: 11px; font-weight: 500; color: var(--muted); }
+
 .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #263238; color: #fff;
   padding: 10px 18px; border-radius: 10px; opacity: 0; transition: .2s; pointer-events: none; z-index: 20; max-width: 80vw; }
 .toast.show { opacity: 1; } .toast.err { background: var(--danger); }
@@ -218,6 +224,11 @@ function onHostMessage(m) {
     document.getElementById("ver").textContent = S.version ? "v" + S.version : "";
     for (const el of document.querySelectorAll("[data-live]"))
       el.textContent = devLive(el.dataset.live === "in" ? S.audio.input : S.audio.output, el.dataset.live);
+    const rcBody = document.querySelector("#modal [data-rx-counts]");
+    if (rcBody) {
+      const r = S.rx.find(x => x.id === +rcBody.dataset.rxCounts);
+      if (r) rcBody.innerHTML = rxCountsBody(r); else closeModal();
+    }
   }
   else if (m.type === "devices") { DEV = m; render(true); }
   else if (m.type === "result") {
@@ -286,7 +297,7 @@ function pageInputs() {
   switch (page) {
     case "matrix": return [S.ports, S.routes, collapsed];
     case "tx": return [S.tx.map(({ packets, ...t }) => t), S.ptp];
-    case "rx": return [S.rx.map(({ packets, ...r }) => r), S.sap.length];
+    case "rx": return [S.rx.map(({ packets, counts, ...r }) => r), S.sap.length];
     case "devices": return [stableAudio(S.audio), S.asio, S.network, S.autostart, DEV];
     case "about": return [S.version];
     default: return [{ ...S, audio: stableAudio(S.audio) }];
@@ -500,6 +511,7 @@ function pageRx() {
   for (const r of S.rx) {
     h += `<div class="card"><div class="card-head">${icon("aes")}<span class="title">${esc(r.name)}</span>${rxStatusBadge(r)}
       <div class="spacer"></div>
+      <button class="icon-btn" title="Receive details" data-act="rx-counts" data-id="${r.id}">${icon("info")}</button>
       <button class="icon-btn" title="Edit" data-act="rx-edit" data-id="${r.id}">${icon("edit")}</button>
       <button class="icon-btn ${r.enabled ? "orange" : "green"}" title="${r.enabled ? "Pause" : "Start"}" data-act="rx-toggle" data-id="${r.id}">${icon(r.enabled ? "pause" : "play")}</button>
       <button class="icon-btn red" title="Delete" data-act="rx-del" data-id="${r.id}">${icon("del")}</button></div>
@@ -546,6 +558,37 @@ function openRxEdit(r) {
     <button class="btn" data-act="rx-save" data-id="${r.id}">Save</button></div>`);
 }
 
+function fmtElapsed(ms) {
+  if (ms == null || ms < 0) return "—";
+  let s = Math.floor(ms / 1000);
+  const h = Math.floor(s / 3600); s %= 3600;
+  const m = Math.floor(s / 60); s %= 60;
+  if (h) return `${h}h ${m}m`;
+  if (m) return `${m}m ${s}s`;
+  return `${s}s`;
+}
+function rxCountsBody(r) {
+  const c = r.counts || {};
+  const total = (c.packets || 0) + (c.lost || 0);
+  const lossPct = total ? (c.lost || 0) / total * 100 : 0;
+  return `<div class="stat-grid">
+    <div class="stat-item"><span class="stat-k">Packets</span><span class="stat-v">${esc((c.packets ?? 0).toLocaleString())}</span></div>
+    <div class="stat-item"><span class="stat-k">Lost</span><span class="stat-v"${c.lost ? ' style="color:var(--danger)"' : ""}>${esc((c.lost ?? 0).toLocaleString())} <span class="sub">(${lossPct.toFixed(2)}%)</span></span></div>
+    <div class="stat-item"><span class="stat-k">Out of order</span><span class="stat-v">${esc((c.late ?? 0).toLocaleString())}</span></div>
+    <div class="stat-item"><span class="stat-k">Malformed</span><span class="stat-v">${esc((c.bad ?? 0).toLocaleString())}</span></div>
+    <div class="stat-item"><span class="stat-k">Other group</span><span class="stat-v">${esc((c.filtered ?? 0).toLocaleString())}</span></div>
+    <div class="stat-item"><span class="stat-k">PT mismatch</span><span class="stat-v">${esc((c.pt_mismatch ?? 0).toLocaleString())}</span></div>
+    <div class="stat-item"><span class="stat-k">SSRC</span><span class="stat-v" style="font-family:Consolas,monospace;font-size:13px">${c.ssrc ? esc(c.ssrc) : "—"}${c.ssrc_changes ? ` <span class="sub" style="color:var(--warn)">(${c.ssrc_changes} chg)</span>` : ""}</span></div>
+    <div class="stat-item"><span class="stat-k">Receiving since</span><span class="stat-v">${fmtElapsed(c.elapsed_ms)}</span></div>
+  </div>`;
+}
+function openRxCounts(r) {
+  openModal(`<div class="card-head">${icon("info")}<span class="title">Receive Details — ${esc(r.name)}</span>
+    <div class="spacer"></div><button class="icon-btn" data-act="close">${icon("close")}</button></div>
+    <div class="card-body" data-rx-counts="${r.id}">${rxCountsBody(r)}</div>
+    <div class="modal-foot"><button class="btn danger" data-act="rx-counts-reset" data-id="${r.id}">Reset counters</button>
+    <button class="btn ghost" data-act="close">Close</button></div>`);
+}
 function devOptions(list, selected, prefix) {
   return list.map(d => `<option value="${prefix}${esc(d.id)}" ${prefix + d.id === selected ? "selected" : ""}>
     ${esc(d.name)}${d.default ? " (default)" : ""} — ${d.channels}ch ${d.rate ? (d.rate / 1000) + "kHz" : ""}</option>`).join("");
@@ -710,6 +753,8 @@ document.body.addEventListener("click", async e => {
       if (r.ok) { closeModal(); toast(`Subscribed to '${s.name}'`); }
       break;
     }
+    case "rx-counts": openRxCounts(S.rx.find(x => x.id === id)); break;
+    case "rx-counts-reset": send("rx_counts_reset", { id }).then(r => r.ok && toast("Counters reset")); break;
     case "rx-edit": openRxEdit(S.rx.find(x => x.id === id)); break;
     case "rx-save": {
       const d = formData("rxForm");
@@ -767,8 +812,10 @@ if (!host) {
     ptp: { lock: "locked", gmid: "00-1D-C1-FF-FE-00-00-01", domain: 0 },
     tx: [{ id: 1, enabled: true, name: "AES67-Bridge TX", channels: 2, address: "239.69.0.1", port: 5004, pt: 98, ttl: 15, running: true, packets: 123456, sdp: "v=0\r\n..." },
          { id: 2, enabled: true, name: "DAW Bus 1-8", channels: 8, address: "239.69.0.2", port: 5004, pt: 98, ttl: 15, running: true, packets: 99 }],
-    rx: [{ id: 1, enabled: true, name: "Console 1-8", channels: 8, address: "239.69.0.18", port: 5004, pt: 98, running: true, receiving: true, packets: 5000 },
-         { id: 2, enabled: true, name: "Stage Box 1-2", channels: 2, address: "239.69.52.17", port: 5004, pt: 97, running: true, receiving: false, packets: 0 }],
+    rx: [{ id: 1, enabled: true, name: "Console 1-8", channels: 8, address: "239.69.0.18", port: 5004, pt: 98, running: true, receiving: true, packets: 5000,
+           counts: { packets: 540000, lost: 3, late: 1, bad: 0, filtered: 12, pt_mismatch: 0, ssrc: "1a2b3c4d", ssrc_changes: 0, elapsed_ms: 540000 } },
+         { id: 2, enabled: true, name: "Stage Box 1-2", channels: 2, address: "239.69.52.17", port: 5004, pt: 97, running: true, receiving: false, packets: 0,
+           counts: { packets: 0, lost: 0, late: 0, bad: 0, filtered: 0, pt_mismatch: 0, ssrc: "", ssrc_changes: 0, elapsed_ms: -1 } }],
     sap: [{ name: "Console 1-8", address: "239.69.0.18", port: 5004, channels: 8, pt: 98, local: false },
           { name: "AES67-TX-1", address: "239.69.7.12", port: 5004, channels: 8, pt: 96, local: false },
           { name: "AES67-Bridge TX", address: "239.69.0.1", port: 5004, channels: 2, pt: 98, local: true }],

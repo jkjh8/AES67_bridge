@@ -372,6 +372,10 @@ std::string Controller::HandleCommand(const std::string& text, bool* send_device
       engine_->SetRoutes(cfg_.routes);
       Persist();
 
+    } else if (cmd == "rx_counts_reset") {
+      const int id = m.value("id", 0);
+      engine_->ResetRxCounts(id);
+
     } else if (cmd == "route_set") {
       Route r{m.value("src", ""), m.value("sc", 0), m.value("dst", ""), m.value("dc", 0)};
       const bool on = m.value("on", true);
@@ -525,6 +529,17 @@ std::string Controller::StateJson() const {
         o["receiving"] = s.receiving;
         o["packets"] = s.packets;
         o["error"] = s.error;
+        char ssrc_hex[9];
+        snprintf(ssrc_hex, sizeof(ssrc_hex), "%08x", s.ssrc);
+        o["counts"] = {{"packets", s.packets},
+                       {"lost", s.lost},
+                       {"late", s.late},
+                       {"bad", s.bad},
+                       {"filtered", s.filtered},
+                       {"pt_mismatch", s.pt_mismatch},
+                       {"ssrc", s.ssrc ? std::string(ssrc_hex) : ""},
+                       {"ssrc_changes", s.ssrc_changes},
+                       {"elapsed_ms", s.since_ms ? (int64_t)(GetTickCount64() - s.since_ms) : -1}};
       }
     rx.push_back(o);
   }

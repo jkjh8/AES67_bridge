@@ -33,6 +33,7 @@ class AudioEngine {
   void SetTxMargin(int us);
   bool ApplyRx(const RxConfig& cfg, std::string* err);
   void RemoveRx(int id);
+  void ResetRxCounts(int id);
   void SetRoutes(const std::vector<Route>& routes);
   void ApplyAudio(const AudioDeviceConfig& cfg);
   void ApplyAsio(const AsioConfig& cfg);
@@ -54,6 +55,12 @@ class AudioEngine {
     uint64_t packets = 0;
     uint64_t filtered = 0;
     uint64_t pt_mismatch = 0;
+    uint64_t lost = 0;
+    uint64_t late = 0;
+    uint64_t bad = 0;
+    uint32_t ssrc = 0;
+    uint64_t ssrc_changes = 0;
+    uint64_t since_ms = 0;
     std::string error;
     std::string diag;
   };

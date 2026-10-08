@@ -59,6 +59,14 @@ struct RxStream::Impl {
   std::atomic<uint64_t> last_pkt_ms{0};
   std::atomic<uint64_t> filtered{0};
   std::atomic<uint64_t> pt_mismatch{0};
+  std::atomic<uint64_t> lost{0};
+  std::atomic<uint64_t> late{0};
+  std::atomic<uint64_t> bad{0};
+  std::atomic<uint32_t> ssrc_cur{0};
+  std::atomic<uint64_t> ssrc_changes{0};
+  std::atomic<bool> have_seq{false};
+  std::atomic<uint16_t> last_seq{0};
+  std::atomic<uint64_t> since_ms{0};
   std::atomic<uint64_t> blk_ok{0}, blk_late{0}, blk_stale{0};
   std::atomic<int32_t> lead{0};
   std::atomic<float> peak{0.0f};
@@ -115,20 +123,50 @@ void RxStream::Impl::RecvLoop() {
       filtered.fetch_add(1, std::memory_order_relaxed);
       continue;
     }
-    if (n < 12) continue;
+    if (n < 12) {
+      bad.fetch_add(1, std::memory_order_relaxed);
+      continue;
+    }
 
     const uint8_t* p = buf.data();
-    if ((p[0] >> 6) != 2) continue;
+    if ((p[0] >> 6) != 2) {
+      bad.fetch_add(1, std::memory_order_relaxed);
+      continue;
+    }
     if ((p[1] & 0x7f) != (uint8_t)cfg.payload_type) {
       pt_mismatch.fetch_add(1, std::memory_order_relaxed);
       continue;
     }
     uint32_t hdr = 12 + (p[0] & 0x0f) * 4;
     if (p[0] & 0x10) {
-      if ((uint32_t)n < hdr + 4) continue;
+      if ((uint32_t)n < hdr + 4) {
+        bad.fetch_add(1, std::memory_order_relaxed);
+        continue;
+      }
       hdr += 4 + (((uint32_t)p[hdr + 2] << 8) | p[hdr + 3]) * 4;
     }
-    if ((uint32_t)n <= hdr) continue;
+    if ((uint32_t)n <= hdr) {
+      bad.fetch_add(1, std::memory_order_relaxed);
+      continue;
+    }
+
+    const uint16_t seq = ((uint16_t)p[2] << 8) | p[3];
+    const uint32_t pkt_ssrc = ((uint32_t)p[8] << 24) | ((uint32_t)p[9] << 16) |
+                              ((uint32_t)p[10] << 8) | p[11];
+    const uint32_t prev_ssrc = ssrc_cur.exchange(pkt_ssrc, std::memory_order_relaxed);
+    const bool had_seq = have_seq.load(std::memory_order_relaxed);
+    const bool ssrc_switch = had_seq && prev_ssrc != pkt_ssrc;
+    if (ssrc_switch) ssrc_changes.fetch_add(1, std::memory_order_relaxed);
+    if (had_seq && !ssrc_switch) {
+      const uint16_t d = (uint16_t)(seq - last_seq.load(std::memory_order_relaxed));
+      if (d > 1 && d < 0x8000) lost.fetch_add(d - 1, std::memory_order_relaxed);
+      else if (d >= 0x8000) late.fetch_add(1, std::memory_order_relaxed);
+    } else {
+      since_ms.store(GetTickCount64(), std::memory_order_relaxed);
+    }
+    have_seq.store(true, std::memory_order_relaxed);
+    last_seq.store(seq, std::memory_order_relaxed);
+
     const uint32_t rtp_ts = ((uint32_t)p[4] << 24) | ((uint32_t)p[5] << 16) |
                             ((uint32_t)p[6] << 8) | p[7];
     const uint8_t* pay = p + hdr;
@@ -272,6 +310,26 @@ int RxStream::channels() const { return (int)impl_->src_ch; }
 uint64_t RxStream::packets() const { return impl_->packets.load(); }
 uint64_t RxStream::filtered() const { return impl_->filtered.load(); }
 uint64_t RxStream::pt_mismatch() const { return impl_->pt_mismatch.load(); }
+uint64_t RxStream::lost() const { return impl_->lost.load(); }
+uint64_t RxStream::late() const { return impl_->late.load(); }
+uint64_t RxStream::bad() const { return impl_->bad.load(); }
+uint32_t RxStream::ssrc() const { return impl_->ssrc_cur.load(); }
+uint64_t RxStream::ssrc_changes() const { return impl_->ssrc_changes.load(); }
+uint64_t RxStream::since_ms() const { return impl_->since_ms.load(); }
+
+void RxStream::ResetCounts() {
+  Impl* im = impl_.get();
+  im->packets.store(0, std::memory_order_relaxed);
+  im->filtered.store(0, std::memory_order_relaxed);
+  im->pt_mismatch.store(0, std::memory_order_relaxed);
+  im->lost.store(0, std::memory_order_relaxed);
+  im->late.store(0, std::memory_order_relaxed);
+  im->bad.store(0, std::memory_order_relaxed);
+  im->ssrc_changes.store(0, std::memory_order_relaxed);
+  im->since_ms.store(0, std::memory_order_relaxed);
+  im->have_seq.store(false, std::memory_order_relaxed);
+}
+
 std::string RxStream::DiagAndReset() {
   Impl* im = impl_.get();
   char b[200];
