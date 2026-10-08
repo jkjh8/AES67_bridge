@@ -1,3 +1,5 @@
+[English](README.md) | [한국어](README.ko.md)
+
 # AES67 Bridge
 
 AES67 Bridge is a Windows tray application. It connects Windows audio (WASAPI) and DAWs (through its own virtual ASIO driver) to AES67 audio-over-IP networks.
@@ -43,6 +45,10 @@ Each transmit and receive card shows its state as an icon next to the name. Hove
 | Orange ■ | Starting | No signal |
 | Grey ■ | Off | Off |
 | Red ■ | Error | Error |
+
+### Receive stream details
+
+Press the ⓘ icon on a receive card for packet statistics since the stream started, or since the counters were last reset: packets received, lost (sequence gaps), out-of-order, malformed, and the sender's current SSRC with a count of how many times it changed (this means the sender restarted its own stream). **Reset counters** zeroes these without interrupting reception.
 
 ## Using the ASIO driver
 
@@ -145,6 +151,7 @@ Changing adapter properties restarts the adapter. Restart AES67 Bridge afterward
 |---|---|
 | PTP never locks | Is there a grandmaster on the chosen interface and domain? Is the firewall rule present? Is the right interface selected under **Devices → Network**? |
 | A receiver reports late packets or timestamp (SAC) errors | Raise the receiver's latency. On a USB Ethernet adapter, apply the [adapter settings](#adapter-settings). |
+| A receive card's [detail view](#receive-stream-details) shows lost or malformed packets | Check cabling and switch QoS, and apply the [adapter settings](#adapter-settings) on a USB Ethernet adapter. A rising SSRC change count means the sender keeps restarting its stream. |
 | Late packets from one transmit stream only | Another device may send to the same multicast address without announcing it. Move the stream to a different address. |
 | No sound from a transmit stream | Is the matrix routing in place, and is the source (ASIO or WASAPI) active? Does the stream show PTP locked? |
 | A stream is not listed under Discovered | Does the sender announce it with SAP? If not, add it manually. |
